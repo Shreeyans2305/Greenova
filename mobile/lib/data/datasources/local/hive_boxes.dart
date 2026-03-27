@@ -1,10 +1,10 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
-import '../../core/config/app_config.dart';
-import '../models/purchase_record_model.dart';
-import '../models/search_history_model.dart';
-import '../models/sustainability_report_model.dart';
-import '../models/user_profile_model.dart';
+import '../../../core/config/app_config.dart';
+import '../../models/purchase_record_model.dart';
+import '../../models/search_history_model.dart';
+import '../../models/sustainability_report_model.dart';
+import '../../models/user_profile_model.dart';
 
 /// Manages Hive database boxes
 class HiveBoxes {

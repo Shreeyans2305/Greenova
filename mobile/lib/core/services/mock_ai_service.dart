@@ -81,7 +81,7 @@ class MockAiService implements AiService {
       totalCarbon += (purchase['carbonScore'] as num?)?.toDouble() ?? 0;
     }
 
-    final avgCarbon = totalItems > 0 ? totalCarbon / totalItems : 0;
+    final double avgCarbon = totalItems > 0 ? totalCarbon / totalItems : 0.0;
 
     String footprintLevel;
     String recommendation;

@@ -76,7 +76,7 @@ class AppTheme {
       unselectedItemColor: Colors.grey,
       type: BottomNavigationBarType.fixed,
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: surfaceLight,
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -135,7 +135,7 @@ class AppTheme {
       unselectedItemColor: Colors.grey,
       type: BottomNavigationBarType.fixed,
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: surfaceDark,
       elevation: 2,
       shape: RoundedRectangleBorder(

@@ -2,7 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provider for network connectivity status
-final connectivityProvider = StreamProvider<List<ConnectivityResult>>((ref) {
+final connectivityProvider = StreamProvider<ConnectivityResult>((ref) {
   return Connectivity().onConnectivityChanged;
 });
 
@@ -10,11 +10,10 @@ final connectivityProvider = StreamProvider<List<ConnectivityResult>>((ref) {
 final hasInternetProvider = Provider<bool>((ref) {
   final connectivity = ref.watch(connectivityProvider);
   return connectivity.when(
-    data: (results) => results.any((r) =>
-      r == ConnectivityResult.mobile ||
-      r == ConnectivityResult.wifi ||
-      r == ConnectivityResult.ethernet
-    ),
+    data: (result) =>
+      result == ConnectivityResult.mobile ||
+      result == ConnectivityResult.wifi ||
+      result == ConnectivityResult.ethernet,
     loading: () => true,
     error: (_, __) => true,
   );
@@ -24,23 +23,21 @@ final hasInternetProvider = Provider<bool>((ref) {
 class NetworkUtils {
   /// Check if the device is connected to the internet
   static Future<bool> hasInternet() async {
-    final results = await Connectivity().checkConnectivity();
-    return results.any((r) =>
-      r == ConnectivityResult.mobile ||
-      r == ConnectivityResult.wifi ||
-      r == ConnectivityResult.ethernet
-    );
+    final result = await Connectivity().checkConnectivity();
+    return result == ConnectivityResult.mobile ||
+      result == ConnectivityResult.wifi ||
+      result == ConnectivityResult.ethernet;
   }
 
   /// Get current connectivity type as a string
   static Future<String> getConnectionType() async {
-    final results = await Connectivity().checkConnectivity();
+    final result = await Connectivity().checkConnectivity();
 
-    if (results.contains(ConnectivityResult.wifi)) {
+    if (result == ConnectivityResult.wifi) {
       return 'WiFi';
-    } else if (results.contains(ConnectivityResult.mobile)) {
+    } else if (result == ConnectivityResult.mobile) {
       return 'Mobile Data';
-    } else if (results.contains(ConnectivityResult.ethernet)) {
+    } else if (result == ConnectivityResult.ethernet) {
       return 'Ethernet';
     } else {
       return 'No Connection';
