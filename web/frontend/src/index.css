@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* ===== GreenNova Design System ===== */
+@theme {
+  --color-primary-50: #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;
+  --color-primary-500: #10b981;
+  --color-primary-600: #059669;
+  --color-primary-700: #047857;
+  --color-primary-800: #065f46;
+  --color-primary-900: #064e3b;
+
+  --color-accent-400: #a3e635;
+  --color-accent-500: #84cc16;
+
+  --color-warn-400: #fbbf24;
+  --color-warn-500: #f59e0b;
+
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+
+  --color-surface-50: #f8fafc;
+  --color-surface-100: #f1f5f9;
+  --color-surface-200: #e2e8f0;
+  --color-surface-700: #334155;
+  --color-surface-800: #1e293b;
+  --color-surface-900: #0f172a;
+  --color-surface-950: #020617;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ===== Base Styles ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: linear-gradient(135deg, var(--color-surface-950) 0%, var(--color-surface-900) 50%, var(--color-primary-900) 100%);
+  color: var(--color-surface-100);
+  min-height: 100vh;
+}
+
+/* ===== Card Glass Effect ===== */
+.glass-card {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 16px;
+}
+
+.glass-card-light {
+  background: rgba(241, 245, 249, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+/* ===== Score Circle ===== */
+.score-circle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-circle svg {
+  transform: rotate(-90deg);
+}
+
+/* ===== Animations ===== */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface-900);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-700);
+  border-radius: 3px;
+}
+
+/* ===== Tier Colors ===== */
+.tier-green { color: #10b981; }
+.tier-amber { color: #f59e0b; }
+.tier-red { color: #ef4444; }
+
+.tier-green-bg { background-color: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); }
+.tier-amber-bg { background-color: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); }
+.tier-red-bg { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); }
