@@ -41,7 +41,6 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigate to home after delay
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         context.go(AppRoutes.home);
@@ -59,14 +58,14 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primaryGreen,
-              AppTheme.primaryGreenLight,
-              AppTheme.secondaryTeal,
+              AppTheme.primaryCharcoal,
+              AppTheme.primarySlate,
+              AppTheme.accentEmerald.withValues(alpha: 0.3),
             ],
           ),
         ),
@@ -78,7 +77,6 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // App Icon
                   Container(
                     width: 120,
                     height: 120,
@@ -87,21 +85,19 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.eco,
+                      Icons.eco_rounded,
                       size: 64,
-                      color: AppTheme.primaryGreen,
+                      color: AppTheme.accentEmerald,
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // App Name
                   const Text(
                     'GreenNova',
                     style: TextStyle(
@@ -112,26 +108,22 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // Tagline
                   Text(
                     'Smart Sustainable Choices',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       letterSpacing: 1,
                     ),
                   ),
                   const SizedBox(height: 48),
-
-                  // Loading indicator
                   SizedBox(
                     width: 32,
                     height: 32,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.8),
+                        Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ),

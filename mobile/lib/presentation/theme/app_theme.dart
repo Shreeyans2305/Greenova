@@ -1,31 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   AppTheme._();
 
-  // Primary Colors - Green/Sustainable Theme
-  static const Color primaryGreen = Color(0xFF2E7D32);
-  static const Color primaryGreenLight = Color(0xFF4CAF50);
-  static const Color primaryGreenDark = Color(0xFF1B5E20);
+  // ───── Primary Palette — Sleek Charcoal Grey ─────
+  static const Color primaryCharcoal = Color(0xFF1A1A2E);
+  static const Color primarySlate = Color(0xFF2D2D44);
+  static const Color primaryDeep = Color(0xFF0D0D1A);
 
-  // Secondary Colors
-  static const Color secondaryTeal = Color(0xFF00897B);
-  static const Color accentYellow = Color(0xFFFFC107);
+  // ───── Accent — Emerald (sustainability indicator) ─────
+  static const Color accentEmerald = Color(0xFF00D27F);
+  static const Color accentEmeraldDark = Color(0xFF00A865);
+  static const Color accentCyan = Color(0xFF00BCD4);
 
-  // Neutral Colors
-  static const Color backgroundLight = Color(0xFFF5F5F5);
-  static const Color backgroundDark = Color(0xFF121212);
+  // ───── Surfaces ─────
+  static const Color backgroundLight = Color(0xFFF2F2F7);
+  static const Color backgroundDark = Color(0xFF0D0D1A);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF1E1E1E);
+  static const Color surfaceDark = Color(0xFF1A1A2E);
+  static const Color cardLight = Color(0xFFFFFFFF);
+  static const Color cardDark = Color(0xFF252538);
 
-  // Score Colors
-  static const Color scoreExcellent = Color(0xFF4CAF50);
-  static const Color scoreGood = Color(0xFF8BC34A);
-  static const Color scoreFair = Color(0xFFFFC107);
-  static const Color scorePoor = Color(0xFFFF9800);
-  static const Color scoreBad = Color(0xFFF44336);
+  // ───── Text shades ─────
+  static const Color textPrimaryLight = Color(0xFF1A1A2E);
+  static const Color textSecondaryLight = Color(0xFF6B6B80);
+  static const Color textPrimaryDark = Color(0xFFF0F0F5);
+  static const Color textSecondaryDark = Color(0xFF9999AA);
 
-  // Grade Colors
+  // ───── Score / Impact Colors ─────
+  static const Color scoreExcellent = Color(0xFF00D27F);
+  static const Color scoreGood = Color(0xFF7ED957);
+  static const Color scoreFair = Color(0xFFFFBF00);
+  static const Color scorePoor = Color(0xFFFF6B35);
+  static const Color scoreBad = Color(0xFFFF3355);
+
+  // ───── Helpers ─────
   static Color getGradeColor(String grade) {
     switch (grade.toUpperCase()) {
       case 'A':
@@ -43,7 +53,6 @@ class AppTheme {
     }
   }
 
-  // Carbon Score Color
   static Color getCarbonScoreColor(double score) {
     if (score <= 20) return scoreExcellent;
     if (score <= 40) return scoreGood;
@@ -52,121 +61,216 @@ class AppTheme {
     return scoreBad;
   }
 
-  // Light Theme
+  static String getEcoscoreLabel(String? grade) {
+    switch (grade?.toLowerCase()) {
+      case 'a':
+        return 'Excellent';
+      case 'b':
+        return 'Good';
+      case 'c':
+        return 'Fair';
+      case 'd':
+        return 'Poor';
+      case 'e':
+        return 'Bad';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  LIGHT THEME
+  // ═══════════════════════════════════════════════════════
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
+    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).apply(
+      bodyColor: textPrimaryLight,
+      displayColor: textPrimaryLight,
+    ),
     colorScheme: ColorScheme.light(
-      primary: primaryGreen,
-      primaryContainer: primaryGreenLight,
-      secondary: secondaryTeal,
+      primary: accentEmerald,
+      primaryContainer: primaryCharcoal,
+      secondary: accentCyan,
       surface: surfaceLight,
       error: scoreBad,
+      onPrimary: Colors.white,
+      onSurface: textPrimaryLight,
+      onSecondary: Colors.white,
     ),
     scaffoldBackgroundColor: backgroundLight,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: primaryGreen,
+    appBarTheme: AppBarTheme(
+      backgroundColor: primaryCharcoal,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
+      titleTextStyle: GoogleFonts.outfit(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+      ),
     ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: surfaceLight,
-      selectedItemColor: primaryGreen,
-      unselectedItemColor: Colors.grey,
+      selectedItemColor: accentEmerald,
+      unselectedItemColor: Colors.grey.shade400,
       type: BottomNavigationBarType.fixed,
+      elevation: 0,
     ),
     cardTheme: CardThemeData(
-      color: surfaceLight,
-      elevation: 2,
+      color: cardLight,
+      elevation: 0,
+      shadowColor: Colors.black.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryGreen,
+        backgroundColor: primaryCharcoal,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+        elevation: 0,
+        textStyle:
+            GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.grey.shade100,
+      contentPadding: const EdgeInsets.all(20),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryGreen, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: accentEmerald, width: 2),
       ),
+      hintStyle: TextStyle(color: Colors.grey.shade400),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: primaryGreen,
+      backgroundColor: accentEmerald,
       foregroundColor: Colors.white,
+      elevation: 4,
     ),
+    chipTheme: ChipThemeData(
+      backgroundColor: Colors.grey.shade100,
+      selectedColor: accentEmerald.withValues(alpha: 0.15),
+      labelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: textPrimaryLight),
+      secondaryLabelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: accentEmerald),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: surfaceLight,
+      titleTextStyle: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimaryLight),
+      contentTextStyle: GoogleFonts.outfit(fontSize: 14, color: textSecondaryLight),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accentEmerald),
+    ),
+    dividerColor: Colors.grey.shade200,
   );
 
-  // Dark Theme
+  // ═══════════════════════════════════════════════════════
+  //  DARK THEME
+  // ═══════════════════════════════════════════════════════
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).apply(
+      bodyColor: textPrimaryDark,
+      displayColor: textPrimaryDark,
+    ),
     colorScheme: ColorScheme.dark(
-      primary: primaryGreenLight,
-      primaryContainer: primaryGreen,
-      secondary: secondaryTeal,
+      primary: accentEmerald,
+      primaryContainer: primarySlate,
+      secondary: accentCyan,
       surface: surfaceDark,
       error: scoreBad,
+      onPrimary: primaryDeep,
+      onSurface: textPrimaryDark,
+      onSecondary: primaryDeep,
     ),
     scaffoldBackgroundColor: backgroundDark,
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: surfaceDark,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
+      titleTextStyle: GoogleFonts.outfit(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+      ),
     ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: surfaceDark,
-      selectedItemColor: primaryGreenLight,
-      unselectedItemColor: Colors.grey,
+      selectedItemColor: accentEmerald,
+      unselectedItemColor: Colors.grey.shade600,
       type: BottomNavigationBarType.fixed,
+      elevation: 0,
     ),
     cardTheme: CardThemeData(
-      color: surfaceDark,
-      elevation: 2,
+      color: cardDark,
+      elevation: 0,
+      shadowColor: Colors.black.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.06), width: 1),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryGreenLight,
-        foregroundColor: Colors.black,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        backgroundColor: accentEmerald,
+        foregroundColor: primaryDeep,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+        elevation: 0,
+        textStyle:
+            GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.grey.shade900,
+      fillColor: cardDark,
+      contentPadding: const EdgeInsets.all(20),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryGreenLight, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: accentEmerald, width: 2),
       ),
+      hintStyle: TextStyle(color: Colors.grey.shade600),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: primaryGreenLight,
-      foregroundColor: Colors.black,
+      backgroundColor: accentEmerald,
+      foregroundColor: primaryDeep,
+      elevation: 4,
     ),
+    chipTheme: ChipThemeData(
+      backgroundColor: cardDark,
+      selectedColor: accentEmerald.withValues(alpha: 0.2),
+      labelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: textPrimaryDark),
+      secondaryLabelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: accentEmerald),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: cardDark,
+      titleTextStyle: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimaryDark),
+      contentTextStyle: GoogleFonts.outfit(fontSize: 14, color: textSecondaryDark),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accentEmerald),
+    ),
+    dividerColor: Colors.white.withValues(alpha: 0.06),
   );
 }

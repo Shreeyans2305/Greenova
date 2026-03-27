@@ -2,16 +2,13 @@ const BADGE_CLASS = "greennova-score-badge";
 const PANEL_ID = "greennova-report-panel";
 const PROCESSED_ATTR = "data-greennova-processed";
 const DEFAULT_ALLOWLIST = ["amazon", "flipkart"];
-const RETRY_ATTR = "data-greennova-retry-count";
-const MAX_RETRY_PER_CARD = 2;
 
-const inFlightKeys = new Set();
-const stateByProductKey = new Map();
 let allowlist = [...DEFAULT_ALLOWLIST];
 let panel;
-let scoringSuspendedUntil = 0;
-let suspensionCode = "";
 let extensionContextValid = true;
+const stateByProductKey = new Map();
+let currentDomainKey = null;
+let currentSelectors = null;
 
 function host() {
   return window.location.hostname.toLowerCase();
@@ -19,7 +16,6 @@ function host() {
 
 function detectDomainKey() {
   const h = host();
-  console.log("[GreenNova] hostname:", h);
   if (h.includes("amazon.")) return "amazon";
   if (h.includes("flipkart.com")) return "flipkart";
   return null;
@@ -37,13 +33,9 @@ function getSelectorsForDomain(domainKey) {
 
   if (domainKey === "flipkart") {
     return {
-      // Keep multiple selectors to survive frequent class-name changes.
       card: "div.bLCLBY, div.tUxRFH, div._1AtVbE, div[data-id]",
-      // Product title link has class atJtCj; also try a[title] as fallback
       title: ".atJtCj, a[title], .KzDlHZ, .s1Q9rs, .IRpwTa",
-      // Price: hZ3P6w is the actual price element
       price: ".hZ3P6w, .Nx9bqj, ._30jeq3",
-      // Brand name: Fo1I0b is the brand div
       brand: ".Fo1I0b, .syl9yP, ._2WkVRV"
     };
   }
@@ -71,10 +63,8 @@ function extractProduct(card, selectors, domainKey) {
   let title = firstText(card, selectors.title);
   const price = firstText(card, selectors.price);
   const brand = firstText(card, selectors.brand);
-  console.log("[GreenNova] extractProduct:", { title, price, brand, domainKey });
 
   if (!title) {
-    // Fallbacks for cards where title structure varies by layout.
     title =
       firstText(card, "h2 span") ||
       firstText(card, "h2 a") ||
@@ -83,8 +73,13 @@ function extractProduct(card, selectors, domainKey) {
   }
 
   if (!title) {
-    // Skip silently: broad card selectors may include wrappers or promo containers.
     return null;
+  }
+
+  let url = window.location.href;
+  const linkEl = card.querySelector("a.a-link-normal, a.atJtCj, a");
+  if (linkEl && linkEl.href) {
+    url = linkEl.href;
   }
 
   return {
@@ -92,8 +87,23 @@ function extractProduct(card, selectors, domainKey) {
     price,
     brand,
     category: domainKey,
-    url: window.location.href
+    url
   };
+}
+
+function looksLikeProductCard(card, selectors) {
+  const hasTitle = Boolean(firstText(card, selectors.title));
+  const hasPrice = Boolean(firstText(card, selectors.price));
+
+  if (hasTitle || hasPrice) {
+    return true;
+  }
+
+  const fallbackTitle =
+    firstText(card, "h2 span") ||
+    firstText(card, "a[title]") ||
+    firstText(card, "img[alt]");
+  return Boolean(fallbackTitle);
 }
 
 function badgeColor(grade) {
@@ -116,6 +126,31 @@ function createBadge(report, onClick) {
   button.title = "Open GreenNova sustainability report";
   button.addEventListener("click", onClick);
   return button;
+}
+
+function createErrorBadge() {
+  const div = document.createElement("div");
+  div.className = BADGE_CLASS;
+  div.style.borderColor = "#ac2f2f";
+  div.style.color = "#ac2f2f";
+  div.style.cursor = "default";
+  div.title = "Local AI could not generate score";
+  div.innerHTML = `<span class="greennova-score-value">ERR</span>`;
+  return div;
+}
+
+function createLoadingBadge() {
+  const div = document.createElement("div");
+  div.className = `${BADGE_CLASS} greennova-loading`;
+  div.style.borderColor = "#c8e9d4";
+  div.style.color = "#2a8f54";
+  div.style.cursor = "wait";
+  div.title = "AI is currently analyzing this product...";
+  div.innerHTML = `
+    <span class="greennova-score-value">...</span>
+    <span class="greennova-score-grade">AI</span>
+  `;
+  return div;
 }
 
 function ensurePanel() {
@@ -157,13 +192,11 @@ function escapeHtml(text) {
     .replaceAll("'", "&#39;");
 }
 
-function openReport(product, report) {
-  const p = ensurePanel();
-  const content = p.querySelector(".greennova-panel-content");
-
-  content.innerHTML = `
+function renderReportContent(container, product, report) {
+  container.innerHTML = `
     <section>
       <h3>${escapeHtml(product.title)}</h3>
+      ${report.isDeep ? '<span style="background: #e6f7ef; color: #0d3a24; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid #c8e9d4;">DEEP ANALYSIS</span>' : ''}
       <p><strong>Score:</strong> ${report.score}/100 (${report.grade})</p>
       <p><strong>Confidence:</strong> ${report.confidence}%</p>
       <p>${escapeHtml(report.summary)}</p>
@@ -185,8 +218,81 @@ function openReport(product, report) {
       <ul>${renderList(report.recommendations)}</ul>
     </section>
   `;
+}
 
+async function fetchProductDetails(url) {
+  try {
+    const response = await fetch(url);
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    
+    const bullets = doc.querySelector('#feature-bullets') || doc.querySelector('#productDescription');
+    const details = doc.querySelector('#detailBullets_feature_div') || doc.querySelector('#prodDetails');
+    const category = doc.querySelector('#wayfinding-breadcrumbs_container');
+    const fkBullets = doc.querySelector('.x-dws') || doc.querySelector('.yN+eE');
+
+    const textData = [
+       bullets ? bullets.textContent : "",
+       details ? details.textContent : "",
+       category ? category.textContent : "",
+       fkBullets ? fkBullets.textContent : ""
+    ].join(" ").replace(/\s+/g, " ").trim();
+    
+    return textData.substring(0, 5000); 
+  } catch(e) {
+    console.warn("[GreenNova] Failed to parse target product URL:", e);
+    return "";
+  }
+}
+
+async function openReport(product, report) {
+  const p = ensurePanel();
+  const content = p.querySelector(".greennova-panel-content");
+
+  // Initial shallow render
+  renderReportContent(content, product, report);
   p.classList.add("open");
+
+  if (!report.isDeep) {
+    const loadingDiv = document.createElement("div");
+    loadingDiv.className = "greennova-deep-loading";
+    loadingDiv.style.textAlign = "center";
+    loadingDiv.style.marginTop = "20px";
+    loadingDiv.style.paddingTop = "20px";
+    loadingDiv.style.borderTop = "1px solid #e5f2eb";
+    loadingDiv.innerHTML = `
+      <div class="greennova-spinner" style="width: 24px; height: 24px; border-width: 3px; margin: 0 auto 10px;"></div>
+      <p style="color: #666; font-size: 11px; margin: 0;">Fetching deep sustainability insights from product page...</p>
+    `;
+    content.appendChild(loadingDiv);
+
+    console.log("[GreenNova] Fetching deep product analysis for URL:", product.url);
+    const detailsText = await fetchProductDetails(product.url);
+    
+    const response = await sendMessage({
+      type: "GREENNOVA_DEEP_SCORE",
+      payload: { product, detailsText }
+    });
+
+    if (loadingDiv.parentNode) {
+      loadingDiv.remove();
+    }
+
+    if (response.ok && response.report) {
+       console.log("[GreenNova] Received deep analysis!", response.report);
+       response.report.isDeep = true;
+       // We DO NOT sync this heavy result back to the badge list to avoid overriding chunks with slow single calls
+       // Instead, replace the sidebar view immediately
+       renderReportContent(content, product, response.report);
+    } else {
+       const errP = document.createElement("p");
+       errP.style.color = "#ac2f2f";
+       errP.style.fontSize = "12px";
+       errP.style.textAlign = "center";
+       errP.textContent = "Could not fetch deep analysis details.";
+       content.appendChild(errP);
+    }
+  }
 }
 
 function sendMessage(message) {
@@ -205,7 +311,6 @@ function sendMessage(message) {
             resolve({ ok: false, code: "CONTEXT_INVALIDATED" });
             return;
           }
-
           resolve({ ok: false, code: "RUNTIME_MESSAGE_FAILED", message: msg });
           return;
         }
@@ -218,102 +323,9 @@ function sendMessage(message) {
         resolve({ ok: false, code: "CONTEXT_INVALIDATED" });
         return;
       }
-
       resolve({ ok: false, code: "RUNTIME_MESSAGE_FAILED", message: msg });
     }
   });
-}
-
-async function loadSettings() {
-  const response = await sendMessage({ type: "GREENNOVA_GET_SETTINGS" });
-  if (response.code === "CONTEXT_INVALIDATED") {
-    return;
-  }
-
-  if (response.ok && response.settings && Array.isArray(response.settings.domainAllowlist)) {
-    // If settings were saved as an empty list, keep safe defaults enabled.
-    const saved = response.settings.domainAllowlist.filter(Boolean);
-    allowlist = saved.length ? saved : [...DEFAULT_ALLOWLIST];
-  }
-}
-
-function domainEnabled(domainKey) {
-  return allowlist.includes(domainKey);
-}
-
-async function scoreCard(card, product) {
-  if (!extensionContextValid || Date.now() < scoringSuspendedUntil) {
-    return false;
-  }
-
-  const key = productKey(product);
-
-  if (stateByProductKey.has(key)) {
-    const existing = stateByProductKey.get(key);
-    const badge = createBadge(existing, () => openReport(product, existing));
-    mountBadge(card, badge);
-    return true;
-  }
-
-  if (inFlightKeys.has(key)) {
-    return false;
-  }
-
-  inFlightKeys.add(key);
-
-  try {
-    console.log("[GreenNova] Sending score request for:", product.title);
-    const response = await sendMessage({
-      type: "GREENNOVA_SCORE_PRODUCT",
-      payload: product
-    });
-
-    console.log("[GreenNova] Response received:", response);
-
-    if (!response.ok || !response.report) {
-      if (response.code === "CONTEXT_INVALIDATED") {
-        extensionContextValid = false;
-        return false;
-      }
-
-      if (response.code === "OLLAMA_FORBIDDEN") {
-        // Avoid flooding logs and repeated failing requests while origin is blocked.
-        scoringSuspendedUntil = Date.now() + 90 * 1000;
-        if (suspensionCode !== response.code) {
-          suspensionCode = response.code;
-          console.warn(
-            "[GreenNova] Ollama rejected extension origin (403). Configure OLLAMA_ORIGINS and restart Ollama."
-          );
-        }
-      }
-
-      return false;
-    }
-
-    console.log("[GreenNova] Mounting badge for:", product.title, "score:", response.report.score);
-    stateByProductKey.set(key, response.report);
-    const badge = createBadge(response.report, () => openReport(product, response.report));
-    mountBadge(card, badge);
-    return true;
-  } finally {
-    inFlightKeys.delete(key);
-  }
-}
-
-function retryObserveCard(card, observer) {
-  const current = Number(card.getAttribute(RETRY_ATTR) || "0");
-  if (current >= MAX_RETRY_PER_CARD) {
-    return;
-  }
-
-  card.setAttribute(RETRY_ATTR, String(current + 1));
-  card.removeAttribute(PROCESSED_ATTR);
-
-  setTimeout(() => {
-    if (document.contains(card) && !card.querySelector(`.${BADGE_CLASS}`)) {
-      observer.observe(card);
-    }
-  }, 1200);
 }
 
 function mountBadge(card, badge) {
@@ -328,120 +340,139 @@ function mountBadge(card, badge) {
   wrapper.className = "greennova-score-wrap";
   wrapper.appendChild(badge);
 
-  if (target.parentElement) {
+  if (target.parentElement && target.tagName !== "DIV") {
     target.parentElement.insertAdjacentElement("afterend", wrapper);
   } else {
     card.appendChild(wrapper);
   }
 }
 
-function buildObserver(selectors, domainKey) {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) {
-          continue;
-        }
-        const card = entry.target;
-        observer.unobserve(card);
-
-        if (card.getAttribute(PROCESSED_ATTR) === "1") {
-          continue;
-        }
-        card.setAttribute(PROCESSED_ATTR, "1");
-
-        const product = extractProduct(card, selectors, domainKey);
-        if (!product) {
-          continue;
-        }
-
-        scoreCard(card, product).then((ok) => {
-          if (!ok) {
-            retryObserveCard(card, observer);
-          }
-        });
-      }
-    },
-    {
-      root: null,
-      threshold: 0.35
-    }
-  );
-
-  return observer;
-}
-
-function looksLikeProductCard(card, selectors) {
-  const hasTitle = Boolean(firstText(card, selectors.title));
-  const hasPrice = Boolean(firstText(card, selectors.price));
-
-  // Many layouts include wrapper containers; require at least one product signal.
-  if (hasTitle || hasPrice) {
-    return true;
+async function handleBatchActivate() {
+  if (!currentDomainKey || !currentSelectors) {
+    console.warn("[GreenNova] Cannot activate batch, domain unsupported.");
+    return;
   }
 
-  // Extra fallback signals used across Amazon/Flipkart variants.
-  const fallbackTitle =
-    firstText(card, "h2 span") ||
-    firstText(card, "a[title]") ||
-    firstText(card, "img[alt]");
-  return Boolean(fallbackTitle);
-}
+  const cards = document.querySelectorAll(currentSelectors.card);
+  const productsPayload = [];
+  const cardMap = new Map();
 
-function watchCards(selectors, domainKey) {
-  const observer = buildObserver(selectors, domainKey);
+  let idCounter = 1;
 
-  const scan = () => {
-    const cards = document.querySelectorAll(selectors.card);
-    console.log(`[GreenNova] scan() — found ${cards.length} cards with selector:`, selectors.card);
-    cards.forEach((card) => {
-      if (!looksLikeProductCard(card, selectors)) {
-        return;
-      }
+  for (const card of cards) {
+    if (!looksLikeProductCard(card, currentSelectors)) {
+      continue;
+    }
 
-      if (!card.querySelector(`.${BADGE_CLASS}`)) {
-        observer.observe(card);
-      }
+    const product = extractProduct(card, currentSelectors, currentDomainKey);
+    if (!product) {
+      continue;
+    }
+
+    const entryId = idCounter++;
+    product.id = entryId;
+    
+    cardMap.set(entryId, { card, product });
+    productsPayload.push(product);
+
+    // Mount loading placeholder immediately
+    mountBadge(card, createLoadingBadge());
+  }
+
+  if (productsPayload.length === 0) {
+    console.log("[GreenNova] No products found on this page.");
+    return;
+  }
+
+  console.log(`[GreenNova] Found ${productsPayload.length} product cards. Processing in batches...`);
+
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < productsPayload.length; i += CHUNK_SIZE) {
+    const chunk = productsPayload.slice(i, i + CHUNK_SIZE);
+    console.log(`[GreenNova] Processing chunk ${Math.floor(i / CHUNK_SIZE) + 1} of ${Math.ceil(productsPayload.length / CHUNK_SIZE)} (${chunk.length} items)...`);
+
+    const response = await sendMessage({
+      type: "GREENNOVA_BATCH_SCORE",
+      payload: chunk
     });
-  };
 
-  scan();
+    if (response.code === "CONTEXT_INVALIDATED") {
+       console.error("[GreenNova] Extension context invalidated.");
+       break;
+    }
 
-  const mutationObserver = new MutationObserver(() => {
-    scan();
-  });
+    if (!response.ok || !response.reports) {
+      console.error(`[GreenNova] Chunk ${Math.floor(i / CHUNK_SIZE) + 1} failed:`, response.message);
+      for (const p of chunk) {
+         const mapping = cardMap.get(p.id);
+         if (mapping) {
+           mountBadge(mapping.card, createErrorBadge());
+         }
+      }
+      continue; 
+    }
 
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+    const reports = response.reports;
+    for (const report of reports) {
+      if (!report || !report.id) continue;
+      
+      const mapping = cardMap.get(report.id);
+      if (mapping) {
+        stateByProductKey.set(productKey(mapping.product), report);
+        const badge = createBadge(report, () => openReport(mapping.product, report));
+        mountBadge(mapping.card, badge);
+      }
+    }
+  }
+
+  console.log("[GreenNova] AI Batch processing complete!");
 }
+
+async function loadSettings() {
+  const response = await sendMessage({ type: "GREENNOVA_GET_SETTINGS" });
+  if (response.code === "CONTEXT_INVALIDATED") {
+    return;
+  }
+
+  if (response.ok && response.settings && Array.isArray(response.settings.domainAllowlist)) {
+    const saved = response.settings.domainAllowlist.filter(Boolean);
+    allowlist = saved.length ? saved : [...DEFAULT_ALLOWLIST];
+  }
+}
+
+function domainEnabled(domainKey) {
+  return allowlist.includes(domainKey);
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "GREENNOVA_ACTIVATE_BATCH_SCORE") {
+    console.log("[GreenNova] Received activate batch message.");
+    handleBatchActivate();
+    sendResponse({ ok: true });
+  }
+});
 
 async function init() {
   console.log("[GreenNova] init() called");
-  const domainKey = detectDomainKey();
-  if (!domainKey) {
+  currentDomainKey = detectDomainKey();
+  if (!currentDomainKey) {
     console.log("[GreenNova] Domain not supported, exiting.");
     return;
   }
-  console.log("[GreenNova] Domain detected:", domainKey);
 
   await loadSettings();
-  console.log("[GreenNova] Allowlist:", allowlist, "| Enabled:", domainEnabled(domainKey));
-
-  if (!domainEnabled(domainKey)) {
+  if (!domainEnabled(currentDomainKey)) {
     console.warn("[GreenNova] Domain is disabled in settings.");
     return;
   }
 
-  const selectors = getSelectorsForDomain(domainKey);
-  if (!selectors) {
-    console.error("[GreenNova] No selectors for domain:", domainKey);
+  currentSelectors = getSelectorsForDomain(currentDomainKey);
+  if (!currentSelectors) {
+    console.error("[GreenNova] No selectors for domain:", currentDomainKey);
     return;
   }
 
-  console.log("[GreenNova] Using selectors:", selectors);
-  watchCards(selectors, domainKey);
+  console.log("[GreenNova] Content script loaded. Awaiting action click.");
 }
 
 init();

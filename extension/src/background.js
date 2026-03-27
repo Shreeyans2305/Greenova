@@ -1,5 +1,5 @@
 const OLLAMA_ENDPOINT = "http://127.0.0.1:11434/api/generate";
-const MODEL_NAME = "gemma3:12b";
+const MODEL_NAME = "gemma3:latest";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 
@@ -53,25 +53,28 @@ function pruneCache() {
   }
 }
 
-function buildPrompt(product) {
+function buildBatchPrompt(products) {
   return [
-    "You are a sustainability analyst.",
-    "Return only strict JSON with this exact shape:",
-    '{"score": number, "grade": "A|B|C|D|E", "summary": string, "positive_impacts": string[], "negative_impacts": string[], "how_it_affects_environment": string, "confidence": number, "recommendations": string[]}',
+    "You are a strict environmental analyst.",
+    "Analyze the product SOLELY based on its ecological footprint, sustainability, and environmental impact.",
+    "DO NOT include general pros/cons like 'low cost', 'fun', or 'convenient'. Every positive_impact, negative_impact, and recommendation MUST be strictly about the Earth, emissions, waste, animals, or eco-materials.",
+    "Return strict JSON which MUST be an array of objects.",
+    "Each object must have this exact shape:",
+    '{"id": number, "score": number, "grade": "A|B|C|D|E", "summary": string, "positive_impacts": string[], "negative_impacts": string[], "how_it_affects_environment": string, "confidence": number, "recommendations": string[]}',
     "Score rules: 0 worst, 100 best.",
     "Grade mapping: A=80-100, B=65-79, C=50-64, D=35-49, E=0-34.",
-    "Be concise, practical, and avoid markdown.",
-    "Product context:",
-    JSON.stringify(product)
+    "Be concise, practical, and avoid markdown. ONLY RETURN JSON.",
+    "Products to score:",
+    JSON.stringify(products)
   ].join("\n");
 }
 
-async function callOllama(product) {
+async function callOllamaBatch(products) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 300000); // 5 mins for batch
 
   try {
-    console.log("[GreenNova BG] Fetching Ollama:", OLLAMA_ENDPOINT, "model:", MODEL_NAME);
+    console.log("[GreenNova BG] Fetching Ollama:", OLLAMA_ENDPOINT, "model:", MODEL_NAME, "for", products.length, "items");
     const response = await fetch(OLLAMA_ENDPOINT, {
       method: "POST",
       headers: {
@@ -79,11 +82,12 @@ async function callOllama(product) {
       },
       body: JSON.stringify({
         model: MODEL_NAME,
-        prompt: buildPrompt(product),
+        prompt: buildBatchPrompt(products),
         stream: false,
         options: {
           temperature: 0.2,
-          num_predict: 350
+          num_predict: 8192,
+          num_ctx: 32768
         }
       }),
       signal: controller.signal
@@ -113,18 +117,19 @@ async function callOllama(product) {
     const data = await response.json();
     console.log("[GreenNova BG] Raw Ollama response length:", data?.response?.length);
     const rawText = (data && data.response ? data.response : "").trim();
-    return parseModelResponse(rawText);
+    console.log("[GreenNova BG] Debug: Ollama response summary", rawText.substring(0, 100) + "...");
+    return parseModelBatchResponse(rawText);
   } catch (err) {
     if (err.name === "AbortError") {
       throw new OllamaRequestError("OLLAMA_TIMEOUT", "Ollama request timed out.");
     }
 
     if (err instanceof OllamaRequestError) {
-      console.warn("[GreenNova BG] callOllama handled error:", err.code);
+      console.warn("[GreenNova BG] callOllamaBatch handled error:", err.code);
       throw err;
     }
 
-    console.warn("[GreenNova BG] callOllama FAILED:", err.name, err.message);
+    console.warn("[GreenNova BG] callOllamaBatch FAILED:", err.name, err.message);
     throw new OllamaRequestError("OLLAMA_UNAVAILABLE", "Could not reach local Ollama.");
   } finally {
     clearTimeout(timeout);
@@ -165,47 +170,87 @@ function extractJson(text) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    const start = text.indexOf("[");
+    const end = text.lastIndexOf("]");
     if (start === -1 || end === -1 || end <= start) {
+      // Fallback if returned an object instead of array
+      const startObj = text.indexOf("{");
+      const endObj = text.lastIndexOf("}");
+      if (startObj !== -1 && endObj !== -1 && endObj > startObj) {
+         const obj = JSON.parse(text.slice(startObj, endObj + 1));
+         return [obj]; // Wrap in array
+      }
       throw error;
     }
     return JSON.parse(text.slice(start, end + 1));
   }
 }
 
-function parseModelResponse(rawText) {
-  const parsed = extractJson(rawText);
-  const score = Math.round(safeNumber(parsed.score, 0, 100, 50));
-  return {
-    score,
-    grade: normalizeGrade(score, parsed.grade),
-    summary: String(parsed.summary || "No summary available."),
-    positiveImpacts: asStringArray(parsed.positive_impacts),
-    negativeImpacts: asStringArray(parsed.negative_impacts),
-    environmentImpact: String(
-      parsed.how_it_affects_environment || "Impact details are unavailable."
-    ),
-    confidence: Math.round(safeNumber(parsed.confidence, 0, 100, 60)),
-    recommendations: asStringArray(parsed.recommendations),
-    generatedAt: new Date().toISOString()
-  };
+function parseModelBatchResponse(rawText) {
+  let parsedArray = extractJson(rawText);
+  if (!Array.isArray(parsedArray)) {
+     if (typeof parsedArray === 'object' && parsedArray.id !== undefined) {
+         parsedArray = [parsedArray];
+     } else {
+         throw new Error("Model did not return a JSON array");
+     }
+  }
+  
+  return parsedArray.map(parsed => {
+    const score = Math.round(safeNumber(parsed.score, 0, 100, 50));
+    return {
+      id: parsed.id,
+      score,
+      grade: normalizeGrade(score, parsed.grade),
+      summary: String(parsed.summary || "No summary available."),
+      positiveImpacts: asStringArray(parsed.positive_impacts),
+      negativeImpacts: asStringArray(parsed.negative_impacts),
+      environmentImpact: String(
+        parsed.how_it_affects_environment || "Impact details are unavailable."
+      ),
+      confidence: Math.round(safeNumber(parsed.confidence, 0, 100, 60)),
+      recommendations: asStringArray(parsed.recommendations),
+      generatedAt: new Date().toISOString()
+    };
+  });
 }
 
-async function scoreProduct(product) {
+async function scoreBatch(products) {
   pruneCache();
-
-  const key = fingerprintProduct(product);
-  const cached = scoreCache.get(key);
-  if (cached && now() - cached.cachedAt <= CACHE_TTL_MS) {
-    return { ...cached.value, cached: true };
+  
+  const uncachedProducts = [];
+  const results = [];
+  
+  for (const product of products) {
+    const key = fingerprintProduct(product);
+    const cached = scoreCache.get(key);
+    
+    if (cached && now() - cached.cachedAt <= CACHE_TTL_MS) {
+      results.push({ ...cached.value, cached: true, id: product.id });
+    } else {
+      uncachedProducts.push(product);
+    }
   }
 
-  const report = await callOllama(product);
-  scoreCache.set(key, { cachedAt: now(), value: report });
-  return { ...report, cached: false };
+  if (uncachedProducts.length > 0) {
+    console.log(`[GreenNova BG] Fetching AI for ${uncachedProducts.length} items`);
+    const newReports = await callOllamaBatch(uncachedProducts);
+    
+    for (const report of newReports) {
+      // Find the corresponding uncached product to cache it
+      const matchingProduct = uncachedProducts.find(p => p.id === report.id);
+      if (matchingProduct) {
+        const key = fingerprintProduct(matchingProduct);
+        scoreCache.set(key, { cachedAt: now(), value: report });
+      }
+      results.push({ ...report, cached: false });
+    }
+  }
+
+  return results;
 }
 
+// Check Ollama health
 async function checkOllama() {
   try {
     const response = await fetch("http://127.0.0.1:11434/api/tags", {
@@ -219,15 +264,83 @@ async function checkOllama() {
   }
 }
 
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    console.log("[GreenNova BG] Action clicked. Messaging tab:", tab.id);
+    chrome.tabs.sendMessage(tab.id, { type: "GREENNOVA_ACTIVATE_BATCH_SCORE" }, (resp) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[GreenNova BG] Could not message tab:", chrome.runtime.lastError.message);
+      }
+    });
+  }
+});
+
+function buildDeepPrompt(product, detailsText) {
+  return [
+    "You are a strict environmental analyst.",
+    "Analyze the product SOLELY based on its ecological footprint, sustainability, and environmental impact considering the materials provided.",
+    "DO NOT include general product pros/cons. Every positive_impact, negative_impact, and recommendation MUST be strictly about the Earth, emissions, recyclability, toxins, or eco-materials.",
+    "Return strict JSON which MUST be an array containing EXACTLY ONE object.",
+    "The object must have this exact shape:",
+    '{"id": number, "score": number, "grade": "A|B|C|D|E", "summary": string, "positive_impacts": string[], "negative_impacts": string[], "how_it_affects_environment": string, "confidence": number, "recommendations": string[]}',
+    "Score rules: 0 worst, 100 best.",
+    "Grade mapping: A=80-100, B=65-79, C=50-64, D=35-49, E=0-34.",
+    "Be highly critical and factual based on the materials provided. EXACT JSON ONLY.",
+    "Product Base Info:",
+    JSON.stringify(product),
+    "Extracted Materials & Specs:",
+    detailsText ? detailsText.substring(0, 4000) : "None"
+  ].join("\n");
+}
+
+async function scoreDeepProduct(product, detailsText) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180000); 
+
+  try {
+    const response = await fetch(OLLAMA_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        prompt: buildDeepPrompt(product, detailsText),
+        stream: false,
+        options: { temperature: 0.2, num_predict: 4096, num_ctx: 16384 }
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) throw new Error("Ollama HTTP " + response.status);
+    const data = await response.json();
+    const parsed = parseModelBatchResponse(data.response);
+    if (parsed && parsed.length > 0) {
+       parsed[0].id = product.id;
+       return parsed[0];
+    }
+    throw new Error("Empty response");
+  } catch(err) {
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) {
     return;
   }
 
-  if (message.type === "GREENNOVA_SCORE_PRODUCT") {
-    scoreProduct(message.payload)
-      .then((report) => {
-        sendResponse({ ok: true, report });
+  if (message.type === "GREENNOVA_DEEP_SCORE") {
+    scoreDeepProduct(message.payload.product, message.payload.detailsText)
+      .then((report) => sendResponse({ ok: true, report }))
+      .catch((err) => sendResponse({ ok: false, message: err.message }));
+    return true;
+  }
+
+  if (message.type === "GREENNOVA_BATCH_SCORE") {
+    scoreBatch(message.payload)
+      .then((reports) => {
+        sendResponse({ ok: true, reports });
       })
       .catch((err) => {
         const code = err && err.code ? err.code : "OLLAMA_UNAVAILABLE";
@@ -238,7 +351,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           meta: err && err.meta ? err.meta : undefined
         });
       });
-    return true;
+    return true; // Keep channel open for async
   }
 
   if (message.type === "GREENNOVA_HEALTHCHECK") {

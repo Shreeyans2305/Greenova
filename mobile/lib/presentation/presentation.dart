@@ -14,11 +14,13 @@ export 'widgets/shell_scaffold.dart';
 export 'widgets/state_widgets.dart';
 
 // Screens
+export 'screens/compare/compare_screen.dart';
 export 'screens/dashboard/carbon_dashboard_screen.dart';
 export 'screens/history/purchase_history_screen.dart';
 export 'screens/home/home_screen.dart';
-export 'screens/scan/barcode_scanner_screen.dart';
 export 'screens/scan/ingredient_scanner_screen.dart';
+export 'screens/scan/product_scanner_screen.dart';
 export 'screens/scan/sustainability_report_screen.dart';
 export 'screens/search/search_screen.dart';
 export 'screens/splash/splash_screen.dart';
+

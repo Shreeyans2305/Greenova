@@ -40,6 +40,19 @@ class SustainabilityReport extends HiveObject {
   @HiveField(11)
   final DateTime generatedAt;
 
+  // New eco-equivalent fields
+  @HiveField(12)
+  final double? treesNeeded;
+
+  @HiveField(13)
+  final double? carMiles;
+
+  @HiveField(14)
+  final int? plasticBags;
+
+  @HiveField(15)
+  final int? lightBulbHours;
+
   SustainabilityReport({
     required this.id,
     required this.productName,
@@ -53,6 +66,10 @@ class SustainabilityReport extends HiveObject {
     required this.searchType,
     required this.isGeneralized,
     required this.generatedAt,
+    this.treesNeeded,
+    this.carMiles,
+    this.plasticBags,
+    this.lightBulbHours,
   });
 
   Map<String, dynamic> toJson() => {
@@ -68,6 +85,10 @@ class SustainabilityReport extends HiveObject {
     'searchType': searchType,
     'isGeneralized': isGeneralized,
     'generatedAt': generatedAt.toIso8601String(),
+    'treesNeeded': treesNeeded,
+    'carMiles': carMiles,
+    'plasticBags': plasticBags,
+    'lightBulbHours': lightBulbHours,
   };
 
   factory SustainabilityReport.fromJson(Map<String, dynamic> json) {
@@ -84,6 +105,10 @@ class SustainabilityReport extends HiveObject {
       searchType: json['searchType'] as String,
       isGeneralized: json['isGeneralized'] as bool? ?? false,
       generatedAt: DateTime.parse(json['generatedAt'] as String),
+      treesNeeded: (json['treesNeeded'] as num?)?.toDouble(),
+      carMiles: (json['carMiles'] as num?)?.toDouble(),
+      plasticBags: (json['plasticBags'] as num?)?.toInt(),
+      lightBulbHours: (json['lightBulbHours'] as num?)?.toInt(),
     );
   }
 
@@ -100,6 +125,10 @@ class SustainabilityReport extends HiveObject {
     String? searchType,
     bool? isGeneralized,
     DateTime? generatedAt,
+    double? treesNeeded,
+    double? carMiles,
+    int? plasticBags,
+    int? lightBulbHours,
   }) {
     return SustainabilityReport(
       id: id ?? this.id,
@@ -114,6 +143,10 @@ class SustainabilityReport extends HiveObject {
       searchType: searchType ?? this.searchType,
       isGeneralized: isGeneralized ?? this.isGeneralized,
       generatedAt: generatedAt ?? this.generatedAt,
+      treesNeeded: treesNeeded ?? this.treesNeeded,
+      carMiles: carMiles ?? this.carMiles,
+      plasticBags: plasticBags ?? this.plasticBags,
+      lightBulbHours: lightBulbHours ?? this.lightBulbHours,
     );
   }
 }

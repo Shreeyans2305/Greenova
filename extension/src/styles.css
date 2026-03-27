@@ -15,6 +15,11 @@
   font-family: Segoe UI, Tahoma, sans-serif;
   padding: 4px 10px;
   line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.greennova-score-badge:hover {
+  background: #e6f7ef;
 }
 
 .greennova-score-value {
@@ -28,6 +33,18 @@
   background: #ffffff;
   border: 1px solid #c8e9d4;
   padding: 3px 6px;
+}
+
+.greennova-loading {
+  animation: greennova-pulse 1.5s infinite;
+  opacity: 0.8;
+  border-color: #c8e9d4 !important;
+}
+
+@keyframes greennova-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 #greennova-report-panel {

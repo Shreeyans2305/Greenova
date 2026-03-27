@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../data/datasources/local/hive_boxes.dart';
 import '../../../data/models/purchase_record_model.dart';
@@ -15,18 +14,9 @@ class PurchaseHistoryScreen extends ConsumerStatefulWidget {
 
 class _PurchaseHistoryScreenState extends ConsumerState<PurchaseHistoryScreen> {
   List<PurchaseRecord> _purchases = [];
-  String _filterCategory = 'All';
-  final _dateFormat = DateFormat('MMM dd, yyyy');
-
-  final List<String> _categories = [
-    'All',
-    'Food & Beverages',
-    'Personal Care',
-    'Household',
-    'Electronics',
-    'Clothing',
-    'General',
-  ];
+  String _selectedFilter = 'All';
+  final _filters = ['All', 'Food & Beverages', 'Personal Care', 'Household',
+      'Electronics', 'Clothing', 'General'];
 
   @override
   void initState() {
@@ -35,188 +25,89 @@ class _PurchaseHistoryScreenState extends ConsumerState<PurchaseHistoryScreen> {
   }
 
   void _loadPurchases() {
+    final all = HiveBoxes.getAllPurchases();
     setState(() {
-      _purchases = HiveBoxes.getAllPurchases();
+      _purchases = _selectedFilter == 'All'
+          ? all
+          : all.where((p) => p.category == _selectedFilter).toList();
     });
-  }
-
-  List<PurchaseRecord> get _filteredPurchases {
-    if (_filterCategory == 'All') return _purchases;
-    return _purchases.where((p) => p.category == _filterCategory).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Purchase History'),
-        backgroundColor: AppTheme.primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.primaryCharcoal,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddPurchaseDialog,
-            tooltip: 'Add manual purchase',
-          ),
+          if (_purchases.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: _confirmClear,
+            ),
         ],
       ),
       body: Column(
         children: [
-          // Stats Summary
-          _buildStatsSummary(),
-
-          // Category Filter
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: _categories.map((category) {
-                final isSelected = category == _filterCategory;
+          // Filters
+          SizedBox(
+            height: 48,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              itemCount: _filters.length,
+              itemBuilder: (ctx, i) {
+                final selected = _filters[i] == _selectedFilter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() => _filterCategory = category);
+                  child: ChoiceChip(
+                    label: Text(_filters[i]),
+                    selected: selected,
+                    onSelected: (_) {
+                      _selectedFilter = _filters[i];
+                      _loadPurchases();
                     },
-                    selectedColor: AppTheme.primaryGreen.withOpacity(0.2),
-                    checkmarkColor: AppTheme.primaryGreen,
                   ),
                 );
-              }).toList(),
+              },
             ),
           ),
 
-          // Purchase List
+          // Content
           Expanded(
-            child: _filteredPurchases.isEmpty
-                ? _buildEmptyState()
-                : _buildPurchaseList(),
+            child: _purchases.isEmpty
+                ? Center(child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.inventory_2_rounded, size: 56,
+                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      Text('No purchases yet',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+                    ],
+                  ))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _purchases.length,
+                    itemBuilder: (ctx, i) => _buildPurchaseItem(_purchases[i], isDark),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsSummary() {
-    final totalItems = _purchases.length;
-    double avgScore = 0;
-    if (totalItems > 0) {
-      avgScore = _purchases.map((p) => p.carbonScore).reduce((a, b) => a + b) / totalItems;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryGreen.withOpacity(0.1),
-            AppTheme.primaryGreenLight.withOpacity(0.05),
-          ],
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _StatItem(
-            icon: Icons.shopping_bag,
-            value: totalItems.toString(),
-            label: 'Total Items',
-            color: AppTheme.primaryGreen,
-          ),
-          _StatItem(
-            icon: Icons.eco,
-            value: avgScore.toStringAsFixed(1),
-            label: 'Avg. Score',
-            color: AppTheme.getCarbonScoreColor(avgScore),
-          ),
-          _StatItem(
-            icon: Icons.category,
-            value: _purchases.map((p) => p.category).toSet().length.toString(),
-            label: 'Categories',
-            color: AppTheme.secondaryTeal,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _filterCategory == 'All'
-                ? 'No purchases recorded'
-                : 'No purchases in $_filterCategory',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Scan products or add them manually',
-            style: TextStyle(color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showAddPurchaseDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Purchase'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPurchaseList() {
-    // Group purchases by date
-    final groupedPurchases = <String, List<PurchaseRecord>>{};
-    for (final purchase in _filteredPurchases) {
-      final dateKey = _dateFormat.format(purchase.purchaseDate);
-      groupedPurchases.putIfAbsent(dateKey, () => []).add(purchase);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
-      itemCount: groupedPurchases.length,
-      itemBuilder: (context, index) {
-        final dateKey = groupedPurchases.keys.elementAt(index);
-        final purchases = groupedPurchases[dateKey]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                dateKey,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
-            ...purchases.map((purchase) => _buildPurchaseCard(purchase)),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildPurchaseCard(PurchaseRecord purchase) {
+  Widget _buildPurchaseItem(PurchaseRecord purchase, bool isDark) {
     final gradeColor = AppTheme.getGradeColor(purchase.sustainabilityGrade);
+    final diff = DateTime.now().difference(purchase.purchaseDate);
+    String dateText;
+    if (diff.inDays == 0) dateText = 'Today';
+    else if (diff.inDays == 1) dateText = 'Yesterday';
+    else if (diff.inDays < 7) dateText = '${diff.inDays} days ago';
+    else dateText = '${purchase.purchaseDate.day}/${purchase.purchaseDate.month}/${purchase.purchaseDate.year}';
 
     return Dismissible(
       key: Key(purchase.id),
@@ -224,240 +115,90 @@ class _PurchaseHistoryScreenState extends ConsumerState<PurchaseHistoryScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.scoreBad.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete_rounded, color: AppTheme.scoreBad),
       ),
-      confirmDismiss: (direction) => _confirmDelete(purchase),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      onDismissed: (_) => _deletePurchase(purchase),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isDark ? AppTheme.cardDark : Colors.white,
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200,
+          ),
+        ),
         child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           leading: Container(
-            width: 48,
-            height: 48,
+            width: 48, height: 48,
             decoration: BoxDecoration(
-              color: gradeColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: gradeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(
-              child: Text(
-                purchase.sustainabilityGrade,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: gradeColor,
-                ),
+            child: Center(child: Text(purchase.sustainabilityGrade, style: TextStyle(
+              fontSize: 22, fontWeight: FontWeight.w900, color: gradeColor))),
+          ),
+          title: Text(purchase.productName, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : AppTheme.primaryCharcoal)),
+          subtitle: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.primarySlate : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(6),
               ),
+              child: Text(purchase.category, style: const TextStyle(fontSize: 11)),
             ),
-          ),
-          title: Text(
-            purchase.productName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Row(
-            children: [
-              Icon(Icons.category, size: 14, color: Colors.grey.shade500),
-              const SizedBox(width: 4),
-              Text(purchase.category),
-              if (purchase.brand != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '| ${purchase.brand}',
-                  style: TextStyle(color: Colors.grey.shade500),
-                ),
-              ],
-            ],
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                purchase.carbonScore.toStringAsFixed(0),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.getCarbonScoreColor(purchase.carbonScore),
-                ),
-              ),
-              Text(
-                'CO2',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-            ],
-          ),
+            const SizedBox(width: 8),
+            Text(dateText, style: TextStyle(fontSize: 12,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade500)),
+          ]),
+          trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(purchase.carbonScore.toStringAsFixed(0), style: TextStyle(
+              fontWeight: FontWeight.w800, fontSize: 18,
+              color: AppTheme.getCarbonScoreColor(purchase.carbonScore))),
+            Text('CO₂', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade400)),
+          ]),
         ),
       ),
     );
   }
 
-  Future<bool> _confirmDelete(PurchaseRecord purchase) async {
-    return await showDialog<bool>(
+  void _deletePurchase(PurchaseRecord purchase) async {
+    await HiveBoxes.deletePurchase(purchase.id);
+    _loadPurchases();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Purchase removed')),
+      );
+    }
+  }
+
+  void _confirmClear() {
+    showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Purchase'),
-        content: Text('Remove "${purchase.productName}" from history?'),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear All History?'),
+        content: const Text('This action cannot be undone.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await HiveBoxes.deletePurchase(purchase.id);
+              Navigator.pop(ctx);
+              await HiveBoxes.clearAllPurchases();
               _loadPurchases();
-              Navigator.pop(context, true);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Clear', style: TextStyle(color: AppTheme.scoreBad)),
           ),
         ],
       ),
-    ) ?? false;
-  }
-
-  void _showAddPurchaseDialog() {
-    final nameController = TextEditingController();
-    final scoreController = TextEditingController(text: '50');
-    String selectedCategory = 'General';
-    String selectedGrade = 'C';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Purchase Manually'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Product Name',
-                    hintText: 'e.g., Organic Shampoo',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: scoreController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Carbon Score (0-100)',
-                    hintText: 'Lower is better',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedCategory,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: _categories
-                      .where((c) => c != 'All')
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (value) {
-                    setDialogState(() => selectedCategory = value!);
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedGrade,
-                  decoration: const InputDecoration(labelText: 'Grade'),
-                  items: ['A', 'B', 'C', 'D', 'F']
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                      .toList(),
-                  onChanged: (value) {
-                    setDialogState(() => selectedGrade = value!);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final score = double.tryParse(scoreController.text) ?? 50;
-
-                if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a product name')),
-                  );
-                  return;
-                }
-
-                final purchase = PurchaseRecord(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  productName: name,
-                  carbonScore: score.clamp(0, 100),
-                  sustainabilityGrade: selectedGrade,
-                  category: selectedCategory,
-                  purchaseDate: DateTime.now(),
-                  addedAt: DateTime.now(),
-                );
-
-                await HiveBoxes.addPurchase(purchase);
-                _loadPurchases();
-                Navigator.pop(context);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  const _StatItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
     );
   }
 }

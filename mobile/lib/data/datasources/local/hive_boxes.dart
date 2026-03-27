@@ -101,6 +101,16 @@ class HiveBoxes {
     await searchHistoryBox.clear();
   }
 
+  /// Clear all purchases
+  static Future<void> clearAllPurchases() async {
+    await purchaseHistoryBox.clear();
+  }
+
+  /// Clear report cache
+  static Future<void> clearReportCache() async {
+    await sustainabilityReportsBox.clear();
+  }
+
   /// Close all boxes
   static Future<void> close() async {
     await purchaseHistoryBox.close();
