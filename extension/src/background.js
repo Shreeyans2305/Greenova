@@ -1,5 +1,5 @@
 const OLLAMA_ENDPOINT = "http://127.0.0.1:11434/api/generate";
-const MODEL_NAME = "gemma3:12b";
+const MODEL_NAME = "gemma3:latest";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 
@@ -61,14 +61,17 @@ function buildPrompt(product) {
     "Score rules: 0 worst, 100 best.",
     "Grade mapping: A=80-100, B=65-79, C=50-64, D=35-49, E=0-34.",
     "Be concise, practical, and avoid markdown.",
+    "Use product title, brand, category, price, and description to estimate material sourcing, durability, recyclability, and likely lifecycle impact.",
+    "Return exactly 3-5 points in positive_impacts, 3-5 points in negative_impacts, and 3-5 points in recommendations.",
+    "If data is missing, state assumptions briefly inside summary.",
     "Product context:",
     JSON.stringify(product)
   ].join("\n");
 }
 
-async function callOllama(product) {
+async function callOllama(product, numPredict = 220, timeoutMs = 60000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     console.log("[GreenNova BG] Fetching Ollama:", OLLAMA_ENDPOINT, "model:", MODEL_NAME);
@@ -83,7 +86,7 @@ async function callOllama(product) {
         stream: false,
         options: {
           temperature: 0.2,
-          num_predict: 350
+          num_predict: numPredict
         }
       }),
       signal: controller.signal
@@ -116,6 +119,10 @@ async function callOllama(product) {
     return parseModelResponse(rawText);
   } catch (err) {
     if (err.name === "AbortError") {
+      if (numPredict > 140) {
+        console.warn("[GreenNova BG] Timeout. Retrying once with lighter settings.");
+        return callOllama(product, 140, 35000);
+      }
       throw new OllamaRequestError("OLLAMA_TIMEOUT", "Ollama request timed out.");
     }
 
@@ -251,7 +258,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GREENNOVA_GET_SETTINGS") {
     chrome.storage.sync.get(
       {
-        domainAllowlist: ["amazon", "flipkart"]
+        domainAllowlist: ["amazon", "flipkart", "greenmart"]
       },
       (settings) => {
         sendResponse({ ok: true, settings });
