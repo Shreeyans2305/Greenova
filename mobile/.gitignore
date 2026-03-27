@@ -1,0 +1,55 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+*.log
+
+# Android
+android/.gradle/
+android/app/debug
+android/app/profile
+android/app/release
+android/local.properties
+*.apk
+*.aab
+
+# iOS
+ios/.symlinks/
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/flutter_export_environment.sh
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Miscellaneous
+*.class
+*.pyc
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+*.lock
+pubspec.lock
+
+# Coverage
+coverage/
+*.lcov
+
+# Generated files (keep tracked)
+# *.g.dart
+# *.freezed.dart
+
+# Environment
+.env
+.env.*

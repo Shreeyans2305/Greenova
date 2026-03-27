@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GreenNova Settings</title>
+    <style>
+      body {
+        font-family: Segoe UI, Tahoma, sans-serif;
+        margin: 24px;
+        color: #16382a;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      .card {
+        border: 1px solid #d9ece2;
+        border-radius: 10px;
+        padding: 16px;
+        max-width: 680px;
+      }
+
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #c9e4d5;
+        border-radius: 8px;
+      }
+
+      button {
+        margin-top: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #b6dcc6;
+        background: #f4fff8;
+        color: #1a4e34;
+        cursor: pointer;
+      }
+
+      .status {
+        margin-top: 10px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GreenNova Settings</h1>
+    <div class="card">
+      <p>Choose where GreenNova runs.</p>
+      <label>
+        <input id="amazon" type="checkbox" value="amazon" /> Amazon
+      </label>
+      <label>
+        <input id="flipkart" type="checkbox" value="flipkart" /> Flipkart
+      </label>
+      <label for="customDomains">Custom domain hints (comma separated)</label>
+      <input id="customDomains" type="text" placeholder="example.com, shop.example" />
+      <button id="saveBtn" type="button">Save Settings</button>
+      <div id="status" class="status"></div>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

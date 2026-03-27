@@ -1,0 +1,717 @@
+time=2026-03-27T23:47:43.786+05:30 level=INFO source=routes.go:1658 msg="server config" env="map[HTTPS_PROXY: HTTP_PROXY: NO_PROXY: OLLAMA_CONTEXT_LENGTH:0 OLLAMA_DEBUG:INFO OLLAMA_EDITOR: OLLAMA_FLASH_ATTENTION:false OLLAMA_GPU_OVERHEAD:0 OLLAMA_HOST:http://127.0.0.1:11434 OLLAMA_KEEP_ALIVE:5m0s OLLAMA_KV_CACHE_TYPE: OLLAMA_LLM_LIBRARY: OLLAMA_LOAD_TIMEOUT:5m0s OLLAMA_MAX_LOADED_MODELS:0 OLLAMA_MAX_QUEUE:512 OLLAMA_MODELS:/Users/shreeyansvichare/.ollama/models OLLAMA_MULTIUSER_CACHE:false OLLAMA_NEW_ENGINE:false OLLAMA_NOHISTORY:false OLLAMA_NOPRUNE:false OLLAMA_NO_CLOUD:false OLLAMA_NUM_PARALLEL:1 OLLAMA_ORIGINS:[* http://localhost https://localhost http://localhost:* https://localhost:* http://127.0.0.1 https://127.0.0.1 http://127.0.0.1:* https://127.0.0.1:* http://0.0.0.0 https://0.0.0.0 http://0.0.0.0:* https://0.0.0.0:* app://* file://* tauri://* vscode-webview://* vscode-file://*] OLLAMA_REMOTES:[ollama.com] OLLAMA_SCHED_SPREAD:false http_proxy: https_proxy: no_proxy:]"
+time=2026-03-27T23:47:43.786+05:30 level=INFO source=routes.go:1660 msg="Ollama cloud disabled: false"
+time=2026-03-27T23:47:43.787+05:30 level=INFO source=images.go:477 msg="total blobs: 26"
+time=2026-03-27T23:47:43.788+05:30 level=INFO source=images.go:484 msg="total unused blobs removed: 0"
+time=2026-03-27T23:47:43.788+05:30 level=INFO source=routes.go:1713 msg="Listening on 127.0.0.1:11434 (version 0.17.7)"
+time=2026-03-27T23:47:43.788+05:30 level=INFO source=runner.go:67 msg="discovering available GPUs..."
+time=2026-03-27T23:47:43.789+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --port 60594"
+time=2026-03-27T23:47:43.867+05:30 level=INFO source=types.go:42 msg="inference compute" id=0 filter_id=0 library=Metal compute=0.0 name=Metal description="Apple M5" libdirs="" driver=0.0 pci_id="" type=discrete total="11.8 GiB" available="11.8 GiB"
+time=2026-03-27T23:47:43.867+05:30 level=INFO source=routes.go:1763 msg="vram-based default context" total_vram="11.8 GiB" default_num_ctx=4096
+time=2026-03-27T23:48:58.910+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-27T23:48:58.911+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 61018"
+time=2026-03-27T23:48:58.912+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="6.2 GiB" free_swap="0 B"
+time=2026-03-27T23:48:58.912+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-27T23:48:58.912+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-27T23:48:58.936+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-27T23:48:58.936+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:61018"
+time=2026-03-27T23:48:58.946+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:48:58.973+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.005 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-27T23:48:58.974+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-27T23:48:59.090+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="254.0 MiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=device.go:272 msg="total memory" size="4.0 GiB"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-27T23:48:59.200+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-27T23:49:00.739+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.83 seconds"
+time=2026-03-27T23:49:00.807+05:30 level=WARN source=runner.go:187 msg="truncating input prompt" limit=4096 prompt=10860 keep=4 new=4096
+[GIN] 2026/03/27 - 23:50:39 | 200 |         1m41s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-27T23:51:32.872+05:30 level=WARN source=runner.go:187 msg="truncating input prompt" limit=4096 prompt=9886 keep=4 new=4096
+[GIN] 2026/03/27 - 23:51:57 | 200 | 24.809309875s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/27 - 23:52:34 | 200 |     705.709µs |       127.0.0.1 | GET      "/"
+[GIN] 2026/03/27 - 23:52:34 | 404 |       3.708µs |       127.0.0.1 | GET      "/favicon.ico"
+[GIN] 2026/03/27 - 23:53:47 | 200 |   16.7948865s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/27 - 23:54:29 | 200 | 15.773495083s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-27T23:56:07.685+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-27T23:56:07.687+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 63126"
+time=2026-03-27T23:56:07.689+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="6.2 GiB" free_swap="0 B"
+time=2026-03-27T23:56:07.689+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-27T23:56:07.689+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-27T23:56:07.800+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-27T23:56:07.801+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:63126"
+time=2026-03-27T23:56:07.811+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:56:07.839+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.012 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-27T23:56:07.841+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-27T23:56:08.071+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-27T23:56:08.257+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-27T23:56:08.258+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-27T23:56:09.764+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.07 seconds"
+[GIN] 2026/03/28 - 00:00:31 | 200 |         4m24s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:05:53.234+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:05:53.236+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 49641"
+time=2026-03-28T00:05:53.238+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="6.5 GiB" free_swap="0 B"
+time=2026-03-28T00:05:53.238+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:05:53.238+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:05:53.290+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:05:53.290+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:49641"
+time=2026-03-28T00:05:53.294+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:05:53.321+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.012 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:05:53.323+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:05:53.541+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:05:53.714+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T00:05:53.716+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:05:53.717+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:05:53.719+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:05:55.230+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.99 seconds"
+[GIN] 2026/03/28 - 00:06:53 | 200 |          1m0s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:07:48 | 200 | 55.712051292s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:08:55 | 200 |          1m6s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:10:09 | 200 |         1m14s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:11:19 | 200 |         1m10s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:11:20.201+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:11:20.204+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 51241"
+time=2026-03-28T00:11:20.208+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="4.0 GiB" free_swap="0 B"
+time=2026-03-28T00:11:20.208+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:11:20.208+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:11:20.309+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:11:20.309+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:51241"
+time=2026-03-28T00:11:20.322+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:20.366+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.013 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:11:20.369+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:11:20.616+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="254.0 MiB"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:11:20.749+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:11:20.750+05:30 level=INFO source=device.go:272 msg="total memory" size="4.0 GiB"
+time=2026-03-28T00:11:20.750+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:11:20.750+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:11:20.750+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:11:21.755+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.55 seconds"
+[GIN] 2026/03/28 - 00:11:23 | 200 |          1m4s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:11:23.464+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:11:23.464+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 51268"
+time=2026-03-28T00:11:23.467+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="2.8 GiB" free_swap="0 B"
+time=2026-03-28T00:11:23.467+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:11:23.467+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:11:23.518+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:11:23.518+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:51268"
+time=2026-03-28T00:11:23.523+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:23.558+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.007 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:11:23.559+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:11:23.758+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:11:23.991+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:11:23.992+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T00:11:23.992+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:11:23.992+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:11:23.992+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:11:25.496+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.03 seconds"
+[GIN] 2026/03/28 - 00:12:37 | 200 |         1m17s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:14:14 | 200 |         1m10s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:15:18 | 200 |          1m3s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:16:17 | 200 |    59.486963s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:36:01.245+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:36:01.247+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 58456"
+time=2026-03-28T00:36:01.249+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="5.2 GiB" free_swap="0 B"
+time=2026-03-28T00:36:01.249+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:36:01.249+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:36:01.334+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:36:01.335+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:58456"
+time=2026-03-28T00:36:01.338+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:36:01.369+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.026 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:36:01.371+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:36:01.677+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:36:01.948+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T00:36:01.950+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:36:01.952+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:36:01.959+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:36:03.715+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.47 seconds"
+[GIN] 2026/03/28 - 00:37:04 | 200 |          1m3s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:37:54 | 200 | 50.650304916s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 00:39:13 | 200 |         1m18s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:39:24.436+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:39:24.439+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 59450"
+time=2026-03-28T00:39:24.441+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="6.7 GiB" free_swap="0 B"
+time=2026-03-28T00:39:24.441+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:39:24.441+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:39:24.501+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:39:24.501+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:59450"
+time=2026-03-28T00:39:24.508+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:39:24.537+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.012 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:39:24.539+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:39:24.798+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:39:24.949+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="494.0 MiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=device.go:272 msg="total memory" size="4.2 GiB"
+time=2026-03-28T00:39:24.951+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:39:24.953+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:39:24.954+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:39:25.958+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.52 seconds"
+[GIN] 2026/03/28 - 00:39:44 | 200 | 20.485261125s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T00:47:57.768+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T00:47:57.773+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 61961"
+time=2026-03-28T00:47:57.774+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="6.0 GiB" free_swap="0 B"
+time=2026-03-28T00:47:57.774+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T00:47:57.774+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T00:47:57.811+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T00:47:57.811+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:61961"
+time=2026-03-28T00:47:57.818+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:47:57.846+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.006 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T00:47:57.848+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T00:47:58.000+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="494.0 MiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=device.go:272 msg="total memory" size="4.2 GiB"
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T00:47:58.142+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T00:47:58.145+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T00:47:59.656+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.88 seconds"
+[GIN] 2026/03/28 - 00:48:16 | 200 | 19.119107208s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T01:23:25.618+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T01:23:25.620+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 56407"
+time=2026-03-28T01:23:25.622+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="4.1 GiB" free_swap="0 B"
+time=2026-03-28T01:23:25.622+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T01:23:25.622+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T01:23:25.688+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T01:23:25.688+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:56407"
+time=2026-03-28T01:23:25.700+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:23:25.735+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.023 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T01:23:25.737+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T01:23:25.961+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:23:26.244+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T01:23:26.246+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T01:23:26.248+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T01:23:26.248+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T01:23:28.008+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.39 seconds"
+[GIN] 2026/03/28 - 01:24:58 | 200 |         1m32s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 01:26:26 | 200 |         1m28s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T01:26:27.086+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T01:26:27.087+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 57289"
+time=2026-03-28T01:26:27.089+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="2.4 GiB" free_swap="0 B"
+time=2026-03-28T01:26:27.090+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T01:26:27.090+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T01:26:27.150+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T01:26:27.150+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:57289"
+time=2026-03-28T01:26:27.156+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:27.186+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.012 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T01:26:27.188+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T01:26:27.357+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:27.514+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="494.0 MiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=device.go:272 msg="total memory" size="4.2 GiB"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T01:26:27.516+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T01:26:28.521+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.43 seconds"
+[GIN] 2026/03/28 - 01:26:48 | 200 |  30.30165975s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T01:26:48.612+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T01:26:48.613+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 57400"
+time=2026-03-28T01:26:48.614+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="2.6 GiB" free_swap="0 B"
+time=2026-03-28T01:26:48.615+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T01:26:48.615+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T01:26:48.652+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T01:26:48.652+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:57400"
+time=2026-03-28T01:26:48.659+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:48.687+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.006 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T01:26:48.689+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T01:26:48.862+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:49.054+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:26:49.054+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T01:26:49.054+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T01:26:49.054+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T01:26:49.055+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T01:26:50.589+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.97 seconds"
+[GIN] 2026/03/28 - 01:28:07 | 200 |         1m40s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T01:28:07.591+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T01:28:07.591+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 57791"
+time=2026-03-28T01:28:07.593+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="2.5 GiB" free_swap="0 B"
+time=2026-03-28T01:28:07.593+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T01:28:07.593+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T01:28:07.634+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T01:28:07.634+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:57791"
+time=2026-03-28T01:28:07.637+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:28:07.665+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.006 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T01:28:07.667+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T01:28:07.818+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:16384 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="494.0 MiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=device.go:272 msg="total memory" size="4.2 GiB"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T01:28:07.961+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T01:28:08.964+05:30 level=INFO source=server.go:1388 msg="llama runner started in 1.37 seconds"
+[GIN] 2026/03/28 - 01:28:31 | 200 |          1m0s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T01:39:58.224+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T01:39:58.225+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 61291"
+time=2026-03-28T01:39:58.226+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="5.6 GiB" free_swap="0 B"
+time=2026-03-28T01:39:58.226+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T01:39:58.226+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T01:39:58.278+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T01:39:58.278+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:61291"
+time=2026-03-28T01:39:58.281+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:39:58.312+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.007 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T01:39:58.314+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T01:39:58.502+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="814.0 MiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=device.go:272 msg="total memory" size="4.6 GiB"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T01:39:58.829+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:32768 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T01:39:58.829+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T01:39:58.830+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T01:39:58.831+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T01:39:58.831+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T01:40:00.590+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.36 seconds"
+[GIN] 2026/03/28 - 01:41:25 | 200 |         1m27s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 01:43:01 | 200 |         1m35s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 01:43:21 | 200 |         1m32s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 01:44:34 | 200 |         1m32s |       127.0.0.1 | POST     "/api/generate"
+time=2026-03-28T02:41:24.756+05:30 level=INFO source=server.go:246 msg="enabling flash attention"
+time=2026-03-28T02:41:24.759+05:30 level=INFO source=server.go:430 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --model /Users/shreeyansvichare/.ollama/models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 --port 63321"
+time=2026-03-28T02:41:24.761+05:30 level=INFO source=sched.go:489 msg="system memory" total="16.0 GiB" free="2.9 GiB" free_swap="0 B"
+time=2026-03-28T02:41:24.762+05:30 level=INFO source=sched.go:496 msg="gpu memory" id=0 library=Metal available="11.3 GiB" free="11.8 GiB" minimum="512.0 MiB" overhead="0 B"
+time=2026-03-28T02:41:24.762+05:30 level=INFO source=server.go:757 msg="loading model" "model layers"=35 requested=-1
+time=2026-03-28T02:41:24.830+05:30 level=INFO source=runner.go:1429 msg="starting ollama engine"
+time=2026-03-28T02:41:24.831+05:30 level=INFO source=runner.go:1464 msg="Server listening on 127.0.0.1:63321"
+time=2026-03-28T02:41:24.840+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:fit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T02:41:24.873+05:30 level=INFO source=ggml.go:136 msg="" architecture=gemma3 file_type=Q4_K_M name="" description="" num_tensors=883 num_key_values=36
+ggml_metal_device_init: testing tensor API for f16 support
+ggml_metal_library_init_from_source: error compiling source
+ggml_metal_device_init: - the tensor API is not supported in this environment - disabling
+ggml_metal_library_init: using embedded metal library
+ggml_metal_library_init: loaded in 0.024 sec
+ggml_metal_rsets_init: creating a residency set collection (keep_alive = 180 s)
+ggml_metal_device_init: GPU name:   Apple M5
+ggml_metal_device_init: GPU family: MTLGPUFamilyApple10  (1010)
+ggml_metal_device_init: GPU family: MTLGPUFamilyCommon3 (3003)
+ggml_metal_device_init: GPU family: MTLGPUFamilyMetal4  (5002)
+ggml_metal_device_init: simdgroup reduction   = true
+ggml_metal_device_init: simdgroup matrix mul. = true
+ggml_metal_device_init: has unified memory    = true
+ggml_metal_device_init: has bfloat            = true
+ggml_metal_device_init: has tensor            = false
+ggml_metal_device_init: use residency sets    = true
+ggml_metal_device_init: use shared buffers    = true
+ggml_metal_device_init: recommendedMaxWorkingSetSize  = 12713.12 MB
+time=2026-03-28T02:41:24.876+05:30 level=INFO source=ggml.go:104 msg=system Metal.0.EMBED_LIBRARY=1 CPU.0.NEON=1 CPU.0.ARM_FMA=1 CPU.0.FP16_VA=1 CPU.0.DOTPROD=1 CPU.0.LLAMAFILE=1 CPU.0.ACCELERATE=1 compiler=cgo(clang)
+ggml_metal_init: allocating
+ggml_metal_init: picking default device: Apple M5
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+time=2026-03-28T02:41:25.187+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:alloc LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T02:41:25.371+05:30 level=INFO source=runner.go:1302 msg=load request="{Operation:commit LoraPath:[] Parallel:1 BatchSize:512 FlashAttention:Enabled KvSize:4096 KvCacheType: NumThreads:4 GPULayers:35[ID:0 Layers:35(0..34)] MultiUserCache:false ProjectorPath: MainGPU:0 UseMmap:false}"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=ggml.go:482 msg="offloading 34 repeating layers to GPU"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=ggml.go:489 msg="offloading output layer to GPU"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=ggml.go:494 msg="offloaded 35/35 layers to GPU"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:240 msg="model weights" device=Metal size="3.1 GiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:245 msg="model weights" device=CPU size="525.0 MiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:251 msg="kv cache" device=Metal size="254.0 MiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:262 msg="compute graph" device=Metal size="158.7 MiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:267 msg="compute graph" device=CPU size="5.0 MiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=device.go:272 msg="total memory" size="4.0 GiB"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=sched.go:565 msg="loaded runners" count=1
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=server.go:1350 msg="waiting for llama runner to start responding"
+time=2026-03-28T02:41:25.372+05:30 level=INFO source=server.go:1384 msg="waiting for server to become available" status="llm server loading model"
+time=2026-03-28T02:41:27.383+05:30 level=INFO source=server.go:1388 msg="llama runner started in 2.62 seconds"
+[GIN] 2026/03/28 - 02:41:47 | 200 | 23.168765417s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 02:42:31 | 200 |  1.402839208s |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/03/28 - 02:45:08 | 200 |    1.278334ms |       127.0.0.1 | GET      "/api/version"
