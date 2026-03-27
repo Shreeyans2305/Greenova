@@ -4,6 +4,7 @@ import { useApi } from "../context/ApiContext";
 
 const navItems = [
   { to: "/", label: "Home", icon: Search },
+  { to: "/calculator", label: "Calculator", icon: Cpu },
   { to: "/history", label: "History", icon: History },
   { to: "/profile", label: "Badges", icon: Award },
 ];

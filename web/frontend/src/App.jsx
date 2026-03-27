@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import ReportDetail from "./pages/ReportDetail";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
+import Calculator from "./pages/Calculator";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
             <Route path="/report/:id" element={<ReportDetail />} />
             <Route path="/history" element={<History />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/calculator" element={<Calculator />} />
           </Routes>
 
           {/* Footer */}
