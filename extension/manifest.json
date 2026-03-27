@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "GreenNova",
+  "version": "0.1.0",
+  "description": "Smart sustainability scores on e-commerce products using local Ollama AI.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://www.amazon.in/*",
+    "https://www.amazon.com/*",
+    "https://*.amazon.in/*",
+    "https://*.amazon.com/*",
+    "https://www.flipkart.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.amazon.in/*",
+        "https://www.amazon.com/*",
+        "https://*.amazon.in/*",
+        "https://*.amazon.com/*",
+        "https://www.flipkart.com/*"
+      ],
+      "js": ["src/content.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "src/options.html",
+  "action": {
+    "default_title": "GreenNova"
+  }
+}

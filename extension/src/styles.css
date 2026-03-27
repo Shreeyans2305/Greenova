@@ -1,0 +1,99 @@
+.greennova-score-wrap {
+  margin-top: 6px;
+  display: inline-flex;
+}
+
+.greennova-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid #2a8f54;
+  border-radius: 999px;
+  background: #f5fff9;
+  color: #0d3a24;
+  cursor: pointer;
+  font-family: Segoe UI, Tahoma, sans-serif;
+  padding: 4px 10px;
+  line-height: 1;
+}
+
+.greennova-score-value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.greennova-score-grade {
+  font-size: 11px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #c8e9d4;
+  padding: 3px 6px;
+}
+
+#greennova-report-panel {
+  position: fixed;
+  top: 0;
+  right: -420px;
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  height: 100vh;
+  background: #ffffff;
+  color: #173126;
+  border-left: 1px solid #d9ede2;
+  box-shadow: -12px 0 40px rgba(9, 40, 26, 0.14);
+  z-index: 2147483646;
+  transition: right 220ms ease;
+  display: flex;
+  flex-direction: column;
+  font-family: Segoe UI, Tahoma, sans-serif;
+}
+
+#greennova-report-panel.open {
+  right: 0;
+}
+
+.greennova-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5f2eb;
+  background: #f5fff9;
+}
+
+.greennova-close {
+  border: 1px solid #b4dcc5;
+  background: white;
+  color: #184a31;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.greennova-panel-content {
+  padding: 14px 16px 20px;
+  overflow-y: auto;
+}
+
+.greennova-panel-content section {
+  margin-bottom: 14px;
+}
+
+.greennova-panel-content h3,
+.greennova-panel-content h4 {
+  margin: 0 0 8px;
+}
+
+.greennova-panel-content p,
+.greennova-panel-content li {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  #greennova-report-panel {
+    width: 100vw;
+    max-width: 100vw;
+    right: -100vw;
+  }
+}
