@@ -63,7 +63,7 @@ class ApiConfig {
 
   // Update with your Ollama server address
   static const String ollamaBaseUrl = 'http://192.168.1.100:11434';
-  static const String ollamaModel = 'gemma3:12b';
+  static const String ollamaModel = 'gemma3:latest';
 }
 ```
 
@@ -71,7 +71,7 @@ class ApiConfig {
 
 1. Install and start Ollama:
    ```bash
-   ollama run gemma3:12b
+   ollama run gemma3:latest
    ```
 
 2. Set `useMockAi = false` in `api_config.dart`

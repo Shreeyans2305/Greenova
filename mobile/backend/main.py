@@ -23,7 +23,7 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_TEXT_MODEL = os.getenv("OLLAMA_TEXT_MODEL", "gemma3:latest")
-OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "gemma3:12b")
+OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "gemma3:latest")
 OFF_BASE = "https://world.openfoodfacts.org"
 
 app = FastAPI(title="GreenNova Backend")
@@ -615,7 +615,7 @@ Respond in JSON format:
         f"prioritize that real data over guesses.",
         off_context,
     )
-    data = await _ollama_generate(prompt, images=[b64])
+    data = await _ollama_generate(prompt)
     
     # Ensure product name uses the best available data
     if off_data and off_data.get("name"):

@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// API Configuration for GreenNova
 /// Backend server handles both AI (Ollama) and product data (Open Food Facts)
 class ApiConfig {
@@ -8,12 +11,16 @@ class ApiConfig {
 
   /// Python backend server configuration
   /// For emulator: 10.0.2.2 maps to host machine's localhost
-  /// For physical device: use your computer's local IP
-  static const String backendBaseUrl = 'http://172.20.10.2:8000';
+  /// For iOS simulator and web: 127.0.0.1
+  static String get backendBaseUrl {
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
+    return 'http://127.0.0.1:8000';
+  }
 
   /// Ollama model names (displayed in settings, used by backend)
   static const String ollamaTextModel = 'gemma3:latest';
-  static const String ollamaVisionModel = 'gemma3:12b';
+  static const String ollamaVisionModel = 'gemma3:latest';
 
   /// Backend API endpoints
   static const String analyzeEndpoint = '/api/analyze';

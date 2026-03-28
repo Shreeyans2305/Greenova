@@ -47,27 +47,26 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
               flexibleSpace: FlexibleSpaceBar(
-                title: Row(
-                  mainAxisSize: MainAxisSize.min,
+                background: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Icon(Icons.eco_rounded, color: AppTheme.accentEmerald, size: 22),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'GreenNova',
-                      style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 20),
+                    Image.asset(
+                      'assets/images/greenova.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.center,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.5),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [AppTheme.primaryDeep, AppTheme.surfaceDark]
-                          : [AppTheme.primaryCharcoal, AppTheme.primarySlate],
-                    ),
-                  ),
                 ),
               ),
             ),
