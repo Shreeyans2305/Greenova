@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Leaf, Package, TrendingUp, ArrowRight, Clock, Plus, CheckCircle } from "lucide-react";
+import { Sparkles, Leaf, Package, TrendingUp, ArrowRight, Clock, Plus, CheckCircle, Award } from "lucide-react";
 import SearchInput from "../components/SearchInput";
 import SustainabilityScoreCard from "../components/SustainabilityScoreCard";
 import IngredientBreakdown from "../components/IngredientBreakdown";
@@ -7,6 +7,7 @@ import AlternativesList from "../components/AlternativesList";
 import NotificationBanner from "../components/NotificationBanner";
 import { analyzeProduct, fileToBase64 } from "../services/api";
 import { addToHistory } from "../utils/localStorage";
+import { checkAndAwardBadges, getUserStatsDisplay } from "../services/badgeService";
 import useAIText from "../hooks/useAIText";
 import useProductContent from "../hooks/useProductContent";
 
@@ -16,6 +17,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [addedToHistory, setAddedToHistory] = useState(false);
+  const [newBadges, setNewBadges] = useState([]);
+  const [userStats, setUserStats] = useState(null);
 
   const t = useAIText("home");
   const pc = useProductContent();

@@ -9,13 +9,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import CORS_ORIGINS, MOCK_MODE, MODEL_NAME, OLLAMA_URL, HOST, PORT, LOG_LEVEL, CACHE_ENABLED, CACHE_TTL
+from config import CORS_ORIGINS, MODEL_NAME, OLLAMA_URL, HOST, PORT, LOG_LEVEL, CACHE_ENABLED, CACHE_TTL
 from models import (
     AnalyzeRequest,
     SearchRequest,
     CalculatorScoreRequest,
     ProductGenerateRequest,
     ContentGenerateRequest,
+    CompareRequest,
+    CompareResponse,
     SustainabilityReport,
     SearchResponse,
     HealthResponse,
@@ -27,6 +29,7 @@ from ai_service import (
     analyze_product_text,
     analyze_product_image,
     search_products,
+    compare_products,
     generate_ui_text,
     generate_calculator_insights,
     generate_content,
@@ -47,7 +50,6 @@ logger = logging.getLogger("greenNova")
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("🌱 GreenNova Backend Starting")
-    logger.info("  MOCK_MODE  : %s", MOCK_MODE)
     logger.info("  MODEL      : %s", MODEL_NAME)
     logger.info("  OLLAMA_URL : %s", OLLAMA_URL)
     logger.info("  CACHE      : %s (TTL=%ds)", CACHE_ENABLED, CACHE_TTL)
@@ -84,10 +86,10 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
-    """Health check endpoint for monitoring and frontend connectivity tests."""
+    """Health check endpoint."""
     return HealthResponse(
         status="ok",
-        mock_mode=MOCK_MODE,
+        mock_mode=False,
         model=MODEL_NAME,
         ollama_url=OLLAMA_URL,
     )
@@ -140,6 +142,30 @@ async def search(request: SearchRequest):
     except Exception as e:
         logger.error("Search endpoint error: %s", e)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.post("/api/compare", response_model=CompareResponse, tags=["Compare"])
+async def compare(request: CompareRequest):
+    """
+    Compare two products for sustainability.
+    
+    - Send `product1` and `product2` as product names/identifiers.
+    - Optionally send `product1_data` and `product2_data` for detailed comparison.
+    """
+    if not request.product1 or not request.product1.strip():
+        raise HTTPException(status_code=400, detail="'product1' must not be empty.")
+    if not request.product2 or not request.product2.strip():
+        raise HTTPException(status_code=400, detail="'product2' must not be empty.")
+
+    try:
+        result = await compare_products(request)
+        logger.info("Compare → %s vs %s | Winner: %s", 
+                    request.product1[:30], request.product2[:30], result.winnerName)
+        return result
+
+    except Exception as e:
+        logger.error("Compare endpoint error: %s", e)
+        raise HTTPException(status_code=500, detail=f"Compare failed: {str(e)}")
 
 
 # ===== New AI Content Endpoints =====

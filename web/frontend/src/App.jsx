@@ -4,6 +4,7 @@ import { ApiProvider } from "./context/ApiContext";
 import { ContentProvider } from "./context/ContentContext";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
+import Compare from "./pages/Compare";
 import ReportDetail from "./pages/ReportDetail";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
@@ -31,6 +32,7 @@ export default function App() {
               <Navbar />
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/compare" element={<Compare />} />
                 <Route path="/report/:id" element={<ReportDetail />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />

@@ -39,6 +39,46 @@ class ContentGenerateRequest(BaseModel):
     context: str = Field("", description="Context for the content generation")
 
 
+# ===== Compare Models =====
+
+class CompareRequest(BaseModel):
+    """Request body for POST /api/compare"""
+    product1: str = Field(..., description="First product name or identifier")
+    product2: str = Field(..., description="Second product name or identifier")
+    product1_data: Optional[dict] = Field(None, description="Full product data for product 1")
+    product2_data: Optional[dict] = Field(None, description="Full product data for product 2")
+
+
+class ComparisonFactor(BaseModel):
+    """A single comparison factor between two products"""
+    name: str = Field(..., description="Factor name (e.g., 'Carbon Footprint', 'Packaging')")
+    score1: float = Field(ge=0, le=10, description="Score for product 1 (0-10 scale)")
+    score2: float = Field(ge=0, le=10, description="Score for product 2 (0-10 scale)")
+    winner: Optional[str] = Field(None, description="'product1', 'product2', or 'tie'")
+
+
+class ProductCompareData(BaseModel):
+    """Product data for comparison display"""
+    id: str
+    name: str
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    score: int = Field(ge=0, le=100)
+    tier: str
+    carbon_footprint: str
+    badge: Optional[str] = None
+
+
+class CompareResponse(BaseModel):
+    """Response body for POST /api/compare"""
+    winner: Optional[str] = Field(None, description="'product1', 'product2', or 'tie'")
+    winnerName: Optional[str] = Field(None, description="Name of the winning product")
+    summary: str = Field(..., description="AI-generated comparison summary")
+    product1: ProductCompareData
+    product2: ProductCompareData
+    comparisonFactors: list[ComparisonFactor] = []
+
+
 # ===== Response Models =====
 
 class IngredientAnalysis(BaseModel):
