@@ -5,19 +5,22 @@
 
 .greennova-score-badge {
   display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
+  width: 52px;
+  height: 52px;
   border: 1px solid rgba(42, 143, 84, 0.3);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(245, 255, 249, 0.9) 0%, rgba(230, 247, 239, 0.8) 100%);
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(245, 255, 249, 0.95) 0%, rgba(230, 247, 239, 0.85) 100%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: #0d3a24;
   cursor: pointer;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  padding: 6px 14px;
-  line-height: 1;
-  box-shadow: 0 4px 12px rgba(42, 143, 84, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(42, 143, 84, 0.15), inset 0 2px 4px rgba(255, 255, 255, 0.9);
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
@@ -28,19 +31,21 @@
 }
 
 .greennova-score-value {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
 }
 
 .greennova-score-grade {
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid rgba(200, 233, 212, 0.8);
-  padding: 3px 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(200, 233, 212, 0.9);
+  padding: 2px 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  line-height: 1;
 }
 
 .greennova-loading {
