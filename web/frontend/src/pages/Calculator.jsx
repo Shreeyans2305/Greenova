@@ -5,7 +5,6 @@ import {
   Calculator as CalcIcon,
   Leaf,
   Car,
-  Home,
   Utensils,
   ShoppingBag,
   Recycle,
@@ -13,13 +12,23 @@ import {
   SkipForward,
   RotateCcw,
   Loader2,
+  Zap,
+  Laptop,
+  Smartphone,
+  Apple,
+  Trash2,
+  Droplets,
 } from "lucide-react";
 import { calculatorQuestions as questions, BASE_IMPACT } from "../data/calculatorData";
 import useAIText from "../hooks/useAIText";
 import useCalculatorInsights from "../hooks/useCalculatorInsights";
 import NotificationBanner from "../components/NotificationBanner";
 
-const ICONS = [Leaf, Car, Home, Utensils, ShoppingBag, Recycle, Plane];
+const ICONS = [
+  Utensils, Car, Car, Plane, Leaf,
+  Zap, Laptop, ShoppingBag, Smartphone,
+  Apple, Trash2, Recycle, Droplets
+];
 
 export default function Calculator() {
   const [step, setStep] = useState(0);
@@ -230,7 +239,7 @@ export default function Calculator() {
         {/* Question Card */}
         <div className="glass-card p-8 text-center space-y-6">
           <Icon className="w-12 h-12 text-accent-emerald mx-auto" />
-          <h2 className="text-2xl font-bold text-text-main">{currentQ.question}</h2>
+          <h2 className="text-2xl font-bold text-text-main">{currentQ.question || currentQ.title}</h2>
 
           <div className="grid gap-3">
             {currentQ.options.map((opt, idx) => (
