@@ -9,7 +9,7 @@ class ApiConfig {
   /// Python backend server configuration
   /// For emulator: 10.0.2.2 maps to host machine's localhost
   /// For physical device: use your computer's local IP
-  static const String backendBaseUrl = 'http://10.0.2.2:8000';
+  static const String backendBaseUrl = 'http://172.20.10.2:8000';
 
   /// Ollama model names (displayed in settings, used by backend)
   static const String ollamaTextModel = 'gemma3:latest';
@@ -24,6 +24,8 @@ class ApiConfig {
   static const String alternativesEndpoint = '/api/alternatives';
   static const String productsSearchEndpoint = '/api/products/search';
   static const String productsDetailEndpoint = '/api/products';
+  static const String ipccReferenceEndpoint = '/api/ipcc-reference';
+  static const String ipccContextEndpoint = '/api/ipcc-context';
   static const String healthEndpoint = '/api/health';
 
   /// Timeouts

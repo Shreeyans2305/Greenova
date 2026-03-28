@@ -162,4 +162,30 @@ class MockAiService implements AiService {
       'generalTip': 'Look for products with eco-certifications.',
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> getIpccReference() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return {
+      'available': true,
+      'data': {
+        'source': 'Mock IPCC Data',
+        'food_emission_factors': {
+          'beef_herd': {'kg_co2e_per_kg': 60.0},
+        }
+      }
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> getIpccContext(String productType) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return {
+      'available': true,
+      'product_type': productType,
+      'emission_factors': {
+        'beef_herd': {'kg_co2e_per_kg': 60.0},
+      }
+    };
+  }
 }

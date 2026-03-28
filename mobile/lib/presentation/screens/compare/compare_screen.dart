@@ -161,6 +161,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       return _buildSelectedProduct(slot, product, isDark);
     }
 
+    final hasText = controller.text.trim().isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -186,7 +188,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           TextField(
             controller: controller,
             decoration: InputDecoration(
-              hintText: 'Search product...',
+              hintText: 'Type a product name...',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: isSearching
                   ? const Padding(
@@ -196,12 +198,38 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     )
-                  : null,
+                  : hasText
+                      ? IconButton(
+                          icon: const Icon(Icons.search_rounded),
+                          onPressed: () => _searchForSlot(slot, controller.text),
+                          tooltip: 'Search database',
+                        )
+                      : null,
             ),
             onTap: () => setState(() => _activeSlot = slot),
+            onChanged: (_) => setState(() {}),
             onSubmitted: (q) => _searchForSlot(slot, q),
             textInputAction: TextInputAction.search,
           ),
+
+          // "Use this name" button — lets the user skip API search
+          if (hasText && results.isEmpty && !isSearching) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _selectProduct(slot, {'name': controller.text.trim()}),
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: Text('Use "${controller.text.trim()}"'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentEmerald,
+                  side: BorderSide(color: AppTheme.accentEmerald.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          ],
+
           if (results.isNotEmpty)
             Container(
               constraints: const BoxConstraints(maxHeight: 200),
@@ -336,10 +364,15 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     final p2 = result['product2'] as Map<String, dynamic>? ?? {};
     final factors = result['comparisonFactors'] as List<dynamic>? ?? [];
 
-    final p1Score = (p1['carbonScore'] as num?)?.toDouble() ?? 50;
-    final p2Score = (p2['carbonScore'] as num?)?.toDouble() ?? 50;
-    final p1Grade = p1['sustainabilityGrade'] ?? 'C';
-    final p2Grade = p2['sustainabilityGrade'] ?? 'C';
+    final p1Score = (p1['carbonScore'] as num?)?.toDouble() ?? 0;
+    final p2Score = (p2['carbonScore'] as num?)?.toDouble() ?? 0;
+    final p1Grade = (p1['sustainabilityGrade'] ?? '').toString();
+    final p2Grade = (p2['sustainabilityGrade'] ?? '').toString();
+
+    final p1HasData = p1Grade.isNotEmpty && p1Grade != 'N/A' && p1Score > 0;
+    final p2HasData = p2Grade.isNotEmpty && p2Grade != 'N/A' && p2Score > 0;
+    final p1Name = _product1?['name'] ?? 'Product 1';
+    final p2Name = _product2?['name'] ?? 'Product 2';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -397,20 +430,41 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildScoreColumn(
-                  _product1?['name'] ?? 'Product 1',
-                  p1Score, p1Grade, isDark,
-                ),
+                child: p1HasData
+                    ? _buildScoreColumn(p1Name, p1Score, p1Grade, isDark)
+                    : _buildNoDataColumn(p1Name, isDark),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildScoreColumn(
-                  _product2?['name'] ?? 'Product 2',
-                  p2Score, p2Grade, isDark,
-                ),
+                child: p2HasData
+                    ? _buildScoreColumn(p2Name, p2Score, p2Grade, isDark)
+                    : _buildNoDataColumn(p2Name, isDark),
               ),
             ],
           ),
+
+          // No data notice
+          if (!p1HasData || !p2HasData) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.scoreFair.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.scoreFair.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: AppTheme.scoreFair, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(
+                    'Limited public data available for ${!p1HasData ? p1Name : p2Name}. Scores are AI estimates.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.scoreFair),
+                  )),
+                ],
+              ),
+            ),
+          ],
 
           // Factor comparison bars
           if (factors.isNotEmpty) ...[
@@ -422,6 +476,18 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                 fontWeight: FontWeight.w700,
                 color: isDark ? Colors.white : AppTheme.primaryCharcoal,
               ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(child: Text(p1Name, textAlign: TextAlign.center,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.accentCyan))),
+                const SizedBox(width: 40),
+                Expanded(child: Text(p2Name, textAlign: TextAlign.center,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.accentEmerald))),
+              ],
             ),
             const SizedBox(height: 12),
             ...factors.map((f) {
@@ -479,6 +545,36 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         minHeight: 8,
         backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
         valueColor: AlwaysStoppedAnimation(color),
+      ),
+    );
+  }
+
+  Widget _buildNoDataColumn(String name, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: isDark ? AppTheme.primarySlate.withValues(alpha: 0.5) : Colors.grey.shade50,
+      ),
+      child: Column(
+        children: [
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+          const SizedBox(height: 12),
+          Container(
+            width: 56, height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.withValues(alpha: 0.15),
+            ),
+            child: Center(child: Icon(Icons.help_outline_rounded,
+                size: 28, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400)),
+          ),
+          const SizedBox(height: 8),
+          Text('No Data', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400)),
+        ],
       ),
     );
   }

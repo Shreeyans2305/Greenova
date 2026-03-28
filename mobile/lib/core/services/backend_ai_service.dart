@@ -164,6 +164,30 @@ class BackendAiService implements AiService {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> getIpccReference() async {
+    try {
+      final response = await _dio.get(ApiConfig.ipccReferenceEndpoint);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception('Backend connection failed: ${e.message}');
+    } catch (e) {
+      throw Exception('Failed to get IPCC reference data: $e');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getIpccContext(String productType) async {
+    try {
+      final response = await _dio.get('${ApiConfig.ipccContextEndpoint}/$productType');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception('Backend connection failed: ${e.message}');
+    } catch (e) {
+      throw Exception('Failed to get IPCC context data: $e');
+    }
+  }
+
   SustainabilityReport _parseReport(
     dynamic data,
     String searchType, {

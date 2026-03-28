@@ -131,8 +131,9 @@ function createBadge(report, onClick) {
 function createErrorBadge() {
   const div = document.createElement("div");
   div.className = BADGE_CLASS;
-  div.style.borderColor = "#ac2f2f";
-  div.style.color = "#ac2f2f";
+  div.style.background = "linear-gradient(135deg, rgba(255, 245, 245, 0.9) 0%, rgba(255, 230, 230, 0.8) 100%)";
+  div.style.borderColor = "rgba(220, 53, 69, 0.3)";
+  div.style.color = "#a72834";
   div.style.cursor = "default";
   div.title = "Local AI could not generate score";
   div.innerHTML = `<span class="greennova-score-value">ERR</span>`;
@@ -142,9 +143,6 @@ function createErrorBadge() {
 function createLoadingBadge() {
   const div = document.createElement("div");
   div.className = `${BADGE_CLASS} greennova-loading`;
-  div.style.borderColor = "#c8e9d4";
-  div.style.color = "#2a8f54";
-  div.style.cursor = "wait";
   div.title = "AI is currently analyzing this product...";
   div.innerHTML = `
     <span class="greennova-score-value">...</span>
@@ -193,13 +191,25 @@ function escapeHtml(text) {
 }
 
 function renderReportContent(container, product, report) {
+  let headerHtml = `<h3>${escapeHtml(product.title)}</h3>`;
+  if (report.isDeep) {
+    headerHtml += `<div style="margin-bottom: 12px;"><span style="background: linear-gradient(135deg, rgba(42,143,84,0.1), rgba(42,143,84,0.05)); color: #177245; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(42,143,84,0.2); backdrop-filter: blur(4px);">✨ DEEP ANALYSIS</span></div>`;
+  }
+  
   container.innerHTML = `
-    <section>
-      <h3>${escapeHtml(product.title)}</h3>
-      ${report.isDeep ? '<span style="background: #e6f7ef; color: #0d3a24; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid #c8e9d4;">DEEP ANALYSIS</span>' : ''}
-      <p><strong>Score:</strong> ${report.score}/100 (${report.grade})</p>
-      <p><strong>Confidence:</strong> ${report.confidence}%</p>
-      <p>${escapeHtml(report.summary)}</p>
+    <section style="background: linear-gradient(135deg, #f0fff4 0%, #e6ffed 100%); border: 1px solid rgba(42, 143, 84, 0.2);">
+      ${headerHtml}
+      <div style="display: flex; gap: 16px; margin-top: 8px;">
+        <div>
+          <span style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Score</span>
+          <div style="font-size: 24px; font-weight: 700; color: #1a202c;">${report.score}<span style="font-size: 14px; color: #718096; font-weight: 500;">/100</span></div>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Grade</span>
+          <div style="font-size: 16px; font-weight: 700; color: #2a8f54; margin-top: 4px; display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.8); border: 1px solid rgba(42,143,84,0.2);">${report.grade}</div>
+        </div>
+      </div>
+      <p style="margin-top: 12px; color: #2d3748; font-weight: 500;">${escapeHtml(report.summary)}</p>
     </section>
     <section>
       <h4>How It Affects The Environment</h4>
@@ -207,15 +217,15 @@ function renderReportContent(container, product, report) {
     </section>
     <section>
       <h4>Positive Impacts</h4>
-      <ul>${renderList(report.positiveImpacts)}</ul>
+      <ul style="color: #2a8f54;">${renderList(report.positiveImpacts)}</ul>
     </section>
     <section>
       <h4>Negative Impacts</h4>
-      <ul>${renderList(report.negativeImpacts)}</ul>
+      <ul style="color: #c53030;">${renderList(report.negativeImpacts)}</ul>
     </section>
     <section>
       <h4>Recommendations</h4>
-      <ul>${renderList(report.recommendations)}</ul>
+      <ul style="color: #2b6cb0;">${renderList(report.recommendations)}</ul>
     </section>
   `;
 }
@@ -257,12 +267,15 @@ async function openReport(product, report) {
     const loadingDiv = document.createElement("div");
     loadingDiv.className = "greennova-deep-loading";
     loadingDiv.style.textAlign = "center";
-    loadingDiv.style.marginTop = "20px";
-    loadingDiv.style.paddingTop = "20px";
-    loadingDiv.style.borderTop = "1px solid #e5f2eb";
+    loadingDiv.style.marginTop = "24px";
+    loadingDiv.style.padding = "24px 16px";
+    loadingDiv.style.borderTop = "1px solid rgba(0,0,0,0.05)";
+    loadingDiv.style.background = "linear-gradient(to bottom, transparent, rgba(255,255,255,0.5))";
+    loadingDiv.style.borderRadius = "0 0 12px 12px";
     loadingDiv.innerHTML = `
-      <div class="greennova-spinner" style="width: 24px; height: 24px; border-width: 3px; margin: 0 auto 10px;"></div>
-      <p style="color: #666; font-size: 11px; margin: 0;">Fetching deep sustainability insights from product page...</p>
+      <div class="greennova-spinner" style="width: 24px; height: 24px; border-width: 3px; border-color: rgba(42, 143, 84, 0.2); border-top-color: #2a8f54; border-radius: 50%; animation: greennova-spin 1s linear infinite; margin: 0 auto 12px;"></div>
+      <p style="color: #4a5568; font-size: 12px; font-weight: 500; margin: 0; animation: greennova-pulse 1.5s infinite;">Fetching deep sustainability insights...</p>
+      <style>@keyframes greennova-spin { to { transform: rotate(360deg); } }</style>
     `;
     content.appendChild(loadingDiv);
 

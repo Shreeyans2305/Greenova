@@ -41,4 +41,10 @@ abstract class AiService {
     String? category,
     List<String>? negativeFactors,
   });
+
+  /// Get full IPCC AR6 reference data
+  Future<Map<String, dynamic>> getIpccReference();
+
+  /// Get IPCC AR6 data filtered by product type
+  Future<Map<String, dynamic>> getIpccContext(String productType);
 }
