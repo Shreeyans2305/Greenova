@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Search, Upload, X } from "lucide-react";
+import useAIText from "../hooks/useAIText";
 
 export default function SearchInput({ onSearch, onImageUpload }) {
   const [query, setQuery] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [uploadedImage, setUploadedImage] = useState(null);
+  const t = useAIText("search");
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -48,19 +50,19 @@ export default function SearchInput({ onSearch, onImageUpload }) {
       {/* Search Bar */}
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-200/40 group-focus-within:text-primary-400 transition-colors" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted/50 group-focus-within:text-accent-emerald transition-colors" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search product name, ingredients, or barcode..."
-            className="w-full pl-12 pr-4 py-4 bg-surface-800/60 border border-surface-700/50 rounded-2xl text-surface-100 placeholder:text-surface-200/30 focus:outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 transition-all duration-300 text-base"
+            placeholder={t("placeholder", "Search product name, ingredients, or barcode...")}
+            className="w-full pl-12 pr-4 py-4 bg-card-bg/60 border border-text-muted/20 rounded-2xl text-text-main placeholder:text-text-muted/50 focus:outline-none focus:border-accent-emerald/50 focus:ring-2 focus:ring-accent-emerald/20 transition-all duration-300 text-base"
           />
           <button
             type="submit"
-            className="absolute right-3 top-1/2 -translate-y-1/2 px-5 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl text-sm font-medium hover:from-primary-400 hover:to-primary-500 transition-all duration-300 shadow-lg shadow-primary-500/20 hover:shadow-primary-500/40"
+            className="absolute right-3 top-1/2 -translate-y-1/2 px-5 py-2 bg-linear-to-r from-accent-emerald to-accent-emerald-dark text-white rounded-xl text-sm font-medium hover:from-accent-emerald-dark hover:to-accent-emerald transition-all duration-300 shadow-lg shadow-accent-emerald/20 hover:shadow-accent-emerald/40"
           >
-            Analyze
+            {t("button", "Analyze")}
           </button>
         </div>
       </form>
@@ -73,8 +75,8 @@ export default function SearchInput({ onSearch, onImageUpload }) {
         onDrop={handleDrop}
         className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer ${
           dragActive
-            ? "border-primary-400 bg-primary-500/10"
-            : "border-surface-700/40 hover:border-primary-500/30 bg-surface-800/30"
+            ? "border-accent-emerald bg-accent-emerald/10"
+            : "border-text-muted/30 hover:border-accent-emerald/30 bg-card-bg/30"
         }`}
       >
         {uploadedImage ? (
@@ -82,19 +84,19 @@ export default function SearchInput({ onSearch, onImageUpload }) {
             <img src={uploadedImage} alt="Uploaded" className="max-h-32 rounded-xl" />
             <button
               onClick={clearImage}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-danger-500 rounded-full flex items-center justify-center text-white hover:bg-danger-400 transition-colors"
+              className="absolute -top-2 -right-2 w-6 h-6 bg-score-f rounded-full flex items-center justify-center text-white hover:opacity-80 transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
           </div>
         ) : (
           <label className="cursor-pointer">
-            <Upload className="w-8 h-8 text-surface-200/30 mx-auto mb-2" />
-            <p className="text-sm text-surface-200/50">
-              Drag & drop a product label image, or{" "}
-              <span className="text-primary-400 hover:text-primary-300 underline">browse</span>
+            <Upload className="w-8 h-8 text-text-muted/30 mx-auto mb-2" />
+            <p className="text-sm text-text-muted">
+              {t("upload_text", "Drag & drop a product label image, or")}{" "}
+              <span className="text-accent-emerald hover:text-accent-emerald-dark underline">{t("browse", "browse")}</span>
             </p>
-            <p className="text-xs text-surface-200/30 mt-1">JPEG, PNG up to 10MB</p>
+            <p className="text-xs text-text-muted/50 mt-1">{t("upload_hint", "JPEG, PNG up to 10MB")}</p>
             <input
               type="file"
               accept="image/jpeg,image/png"

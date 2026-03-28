@@ -1,5 +1,5 @@
 """
-GreenNova Backend - Pydantic Models
+EcoTrack Backend - Pydantic Models
 Request/Response schemas for all API endpoints.
 """
 
@@ -19,6 +19,24 @@ class AnalyzeRequest(BaseModel):
 class SearchRequest(BaseModel):
     """Request body for POST /api/search"""
     query: str = Field(..., description="Search query — product name, category, or brand")
+
+
+class CalculatorScoreRequest(BaseModel):
+    """Request body for POST /api/calculator/score"""
+    answers: dict = Field(..., description="User answers keyed by question ID with numeric values")
+    total_co2: float = Field(..., description="Total calculated CO2 in tons")
+
+
+class ProductGenerateRequest(BaseModel):
+    """Request body for POST /api/products/generate"""
+    context: str = Field("general", description="Product category or context for generation")
+    count: int = Field(3, ge=1, le=10, description="Number of products to generate")
+
+
+class ContentGenerateRequest(BaseModel):
+    """Request body for POST /api/content/generate"""
+    content_type: str = Field(..., description="Type of content: 'notification', 'tip', 'description', 'error'")
+    context: str = Field("", description="Context for the content generation")
 
 
 # ===== Response Models =====
@@ -78,3 +96,27 @@ class HealthResponse(BaseModel):
     mock_mode: bool
     model: str
     ollama_url: str
+
+
+class UITextResponse(BaseModel):
+    """Response for GET /api/ui-text"""
+    section: str
+    content: dict
+    cached: bool = False
+
+
+class CalculatorScoreResponse(BaseModel):
+    """Response for POST /api/calculator/score"""
+    total_co2: float
+    badge: str
+    badge_color: str
+    insights: list[str] = []
+    tips: list[str] = []
+    comparison: str = ""
+
+
+class ContentGenerateResponse(BaseModel):
+    """Response for POST /api/content/generate"""
+    content_type: str
+    text: str
+    cached: bool = False

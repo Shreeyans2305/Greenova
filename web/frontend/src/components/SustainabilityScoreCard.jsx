@@ -1,74 +1,64 @@
-import { getTierColor } from "../data/mockData";
+import { getTierColor, getTierLabel } from "../data/mockData";
+import { Leaf, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-export default function SustainabilityScoreCard({ score, tier, badge, productName, compact = false }) {
-  const tierColor = getTierColor(tier);
-  const radius = compact ? 36 : 54;
-  const stroke = compact ? 5 : 7;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
+export default function SustainabilityScoreCard({ score, tier, badge, carbonFootprint, description }) {
+  const tierColors = getTierColor(tier);
+  const tierColor = tierColors.text;
+  const tierLabel = getTierLabel(tier);
+
+  const ScoreIcon = score >= 75 ? TrendingUp : score >= 50 ? Minus : TrendingDown;
 
   return (
-    <div
-      className={`glass-card p-6 flex items-center gap-6 transition-all duration-300 hover:border-primary-500/30 ${
-        compact ? "p-4 gap-4" : ""
-      }`}
-      style={{ borderColor: tierColor.border }}
-    >
-      {/* Circular Score */}
-      <div className="score-circle flex-shrink-0">
-        <svg width={(radius + stroke) * 2} height={(radius + stroke) * 2}>
-          {/* Background circle */}
-          <circle
-            cx={radius + stroke}
-            cy={radius + stroke}
-            r={radius}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={stroke}
-          />
-          {/* Score arc */}
-          <circle
-            cx={radius + stroke}
-            cy={radius + stroke}
-            r={radius}
-            fill="none"
-            stroke={tierColor.text}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            style={{ transition: "stroke-dashoffset 1s ease-out" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`font-bold ${compact ? "text-xl" : "text-3xl"}`} style={{ color: tierColor.text }}>
-            {score}
-          </span>
-          <span className="text-[10px] text-surface-200/50 uppercase tracking-wider">score</span>
+    <div className="glass-card p-6">
+      {/* Score Circle */}
+      <div className="flex items-center gap-6 mb-4">
+        <div className="relative w-24 h-24 shrink-0">
+          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+            <circle
+              cx="50"
+              cy="50"
+              r="42"
+              fill="none"
+              stroke={tierColor}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={`${score * 2.64} 264`}
+              className="transition-all duration-1000 ease-out"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <span className="text-2xl font-bold text-text-main">{score}</span>
+              <span className="text-xs text-text-muted block">/100</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        {productName && (
-          <h3 className={`font-semibold text-surface-100 truncate ${compact ? "text-sm" : "text-lg"}`}>
-            {productName}
-          </h3>
-        )}
-        <div className="flex items-center gap-2 mt-1">
-          <span
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-            style={{ backgroundColor: tierColor.bg, borderColor: tierColor.border, color: tierColor.text }}
-          >
-            {tier}
-          </span>
+        <div className="flex-1 min-w-0">
           {badge && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-500/10 text-primary-300 border border-primary-500/20">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/20 mb-2">
+              <Leaf className="w-3 h-3" />
               {badge}
             </span>
           )}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium" style={{ color: tierColor }}>
+              {tierLabel}
+            </span>
+            <ScoreIcon className="w-4 h-4" style={{ color: tierColor }} />
+          </div>
+          <p className="text-sm text-text-muted line-clamp-2">{description}</p>
         </div>
       </div>
+
+      {/* Carbon Footprint */}
+      {carbonFootprint && (
+        <div className="glass-card-light p-3 flex items-center justify-between">
+          <span className="text-xs text-text-muted">Carbon Footprint</span>
+          <span className="text-sm font-medium text-text-main">{carbonFootprint}</span>
+        </div>
+      )}
     </div>
   );
 }

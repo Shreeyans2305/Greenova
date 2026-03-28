@@ -1,4 +1,4 @@
-# 🌱 GreenNova Backend
+# 🌱 EcoTrack Backend
 
 FastAPI backend for AI-powered sustainability analysis. Uses **Ollama** with **Gemma 3 12B** locally for privacy-first product analysis.
 

@@ -9,13 +9,13 @@ export default function NotificationBanner({ type = "warning", message, dismissi
   const styles = {
     warning: {
       bg: "bg-warn-500/10 border-warn-500/30",
-      icon: <AlertTriangle className="w-5 h-5 text-warn-400 flex-shrink-0" />,
+      icon: <AlertTriangle className="w-5 h-5 text-warn-400 shrink-0" />,
       text: "text-warn-400",
     },
     success: {
-      bg: "bg-primary-500/10 border-primary-500/30",
-      icon: <CheckCircle className="w-5 h-5 text-primary-400 flex-shrink-0" />,
-      text: "text-primary-300",
+      bg: "bg-accent-emerald/10 border-accent-emerald/30",
+      icon: <CheckCircle className="w-5 h-5 text-accent-emerald shrink-0" />,
+      text: "text-accent-emerald",
     },
   };
 
@@ -26,7 +26,7 @@ export default function NotificationBanner({ type = "warning", message, dismissi
       {s.icon}
       <p className={`text-sm flex-1 ${s.text}`}>{message}</p>
       {dismissible && (
-        <button onClick={() => setVisible(false)} className="text-surface-200/40 hover:text-surface-200/70 transition-colors">
+        <button onClick={() => setVisible(false)} className="text-text-muted hover:text-text-main transition-colors">
           <X className="w-4 h-4" />
         </button>
       )}

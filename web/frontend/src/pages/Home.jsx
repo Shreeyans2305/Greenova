@@ -1,50 +1,52 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Leaf, TrendingUp, Sparkles, Clock, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, Leaf, Package, TrendingUp, ArrowRight, Clock, Plus, CheckCircle } from "lucide-react";
 import SearchInput from "../components/SearchInput";
 import SustainabilityScoreCard from "../components/SustainabilityScoreCard";
 import IngredientBreakdown from "../components/IngredientBreakdown";
 import AlternativesList from "../components/AlternativesList";
 import NotificationBanner from "../components/NotificationBanner";
-import { mockRecentSearches } from "../data/mockData";
-import { analyzeProduct, searchProducts, fileToBase64 } from "../services/api";
+import { analyzeProduct, fileToBase64 } from "../services/api";
 import { addToHistory } from "../utils/localStorage";
+import useAIText from "../hooks/useAIText";
+import useProductContent from "../hooks/useProductContent";
 
 export default function Home() {
-  const navigate = useNavigate();
+  const [report, setReport] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [report, setReport] = useState(null);         // full analyze result
-  const [searchResults, setSearchResults] = useState(null); // search results list
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [addedToHistory, setAddedToHistory] = useState(false);
+
+  const t = useAIText("home");
+  const pc = useProductContent();
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("gn_recent_searches") || "[]");
+      setRecentSearches(saved.slice(0, 5));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const saveRecentSearch = (query) => {
+    const updated = [query, ...recentSearches.filter((s) => s !== query)].slice(0, 5);
+    setRecentSearches(updated);
+    localStorage.setItem("gn_recent_searches", JSON.stringify(updated));
+  };
 
   const handleSearch = async (query) => {
-    if (!query.trim()) return;
     setLoading(true);
-    setError(null);
     setReport(null);
-    setSearchResults(null);
+    setSearchResults([]);
+    setAddedToHistory(false);
+    saveRecentSearch(query);
 
     try {
-      // First try to get a full analyze report from the backend
       const result = await analyzeProduct({ text: query });
       setReport(result);
-
-      // Auto-add to local history
-      addToHistory({
-        productName: result.product_name,
-        category: result.category || "General",
-        score: result.score,
-        quantity: 1,
-      });
     } catch (err) {
-      console.error("Analyze failed, trying search:", err);
-      try {
-        // Fallback: try search endpoint
-        const searchResult = await searchProducts(query);
-        setSearchResults(searchResult.results || []);
-      } catch (searchErr) {
-        setError(searchErr.message || "Something went wrong. Please try again.");
-      }
+      console.error("Analysis failed:", err);
     } finally {
       setLoading(false);
     }
@@ -52,213 +54,189 @@ export default function Home() {
 
   const handleImageUpload = async (file) => {
     setLoading(true);
-    setError(null);
     setReport(null);
-    setSearchResults(null);
+    setSearchResults([]);
+    setAddedToHistory(false);
 
     try {
-      const base64 = await fileToBase64(file);
-      const result = await analyzeProduct({ image_b64: base64 });
+      const b64 = await fileToBase64(file);
+      const result = await analyzeProduct({ image_b64: b64 });
       setReport(result);
-
-      addToHistory({
-        productName: result.product_name,
-        category: result.category || "General",
-        score: result.score,
-        quantity: 1,
-      });
     } catch (err) {
-      setError(err.message || "Image analysis failed. Please try again.");
+      console.error("Image analysis failed:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleAddToHistory = () => {
+    if (report && !addedToHistory) {
+      addToHistory({
+        name: report.product_name,
+        brand: report.brand,
+        category: report.category,
+        score: report.score,
+        tier: report.tier,
+        carbonFootprint: report.carbon_footprint,
+      });
+      setAddedToHistory(true);
+    }
+  };
+
   const clearResults = () => {
     setReport(null);
-    setSearchResults(null);
-    setError(null);
+    setSearchResults([]);
+    setAddedToHistory(false);
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Hero Section */}
-        <div className="text-center mb-10 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/20 mb-6">
-            <Sparkles className="w-4 h-4 text-primary-400" />
-            <span className="text-sm text-primary-300">AI-Powered Sustainability</span>
+    <main className="max-w-4xl mx-auto px-4 pt-24 pb-16 space-y-8 animate-fade-in-up">
+      {/* Hero */}
+      <section className="text-center space-y-4 pt-8">
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20">
+          <Sparkles className="w-3 h-3" />
+          {t("badge_label", "AI-Powered Sustainability")}
+        </span>
+        <h1 className="text-5xl sm:text-6xl font-bold leading-tight">
+          <span className="bg-linear-to-r from-accent-emerald via-accent-cyan to-accent-emerald-dark bg-clip-text text-transparent">
+            {t("hero_title_1", "Know Your Impact.")}
+          </span>
+          <br />
+          <span className="text-text-main">{t("hero_title_2", "Choose Better.")}</span>
+        </h1>
+        <p className="text-text-muted text-lg max-w-2xl mx-auto">
+          {t("hero_subtitle", "Paste ingredients, scan barcodes, or upload product labels — get instant sustainability reports powered by AI.")}
+        </p>
+      </section>
+
+      {/* Stats */}
+      <section className="grid grid-cols-3 gap-4">
+        {[
+          { icon: Package, value: "10K+", label: t("stat_products", "Products Analyzed") },
+          { icon: TrendingUp, value: "85%", label: t("stat_score", "Avg Eco Score") },
+          { icon: Leaf, value: "2.4K", label: t("stat_alternatives", "Alternatives Found") },
+        ].map(({ icon: Icon, value, label }) => (
+          <div key={label} className="glass-card p-4 text-center hover:border-accent-emerald/30 transition-all duration-300">
+            <Icon className="w-5 h-5 text-accent-emerald mx-auto mb-2" />
+            <div className="text-xl font-bold text-text-main">{value}</div>
+            <div className="text-xs text-text-muted">{label}</div>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-            <span className="bg-gradient-to-r from-primary-300 via-primary-400 to-accent-400 bg-clip-text text-transparent">
-              Know Your Impact.
-            </span>
-            <br />
-            <span className="text-surface-100">Choose Better.</span>
-          </h1>
-          <p className="text-surface-200/50 text-lg max-w-2xl mx-auto">
-            Paste ingredients, scan barcodes, or upload product labels — get instant sustainability reports powered by AI.
-          </p>
-        </div>
+        ))}
+      </section>
 
-        {/* Search */}
-        <div className="animate-fade-in-up stagger-1" style={{ opacity: 0 }}>
-          <SearchInput onSearch={handleSearch} onImageUpload={handleImageUpload} />
-        </div>
+      {/* Search */}
+      <SearchInput onSearch={handleSearch} onImageUpload={handleImageUpload} />
 
-        {/* Stats Bar */}
-        <div className="grid grid-cols-3 gap-4 mt-8 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
-          {[
-            { icon: Leaf, label: "Products Analyzed", value: "2,847" },
-            { icon: TrendingUp, label: "Avg Eco Score", value: "74" },
-            { icon: Sparkles, label: "Alternatives Found", value: "1,203" },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="glass-card-light p-4 text-center">
-              <Icon className="w-5 h-5 text-primary-400 mx-auto mb-1" />
-              <p className="text-xl font-bold text-surface-100">{value}</p>
-              <p className="text-xs text-surface-200/40">{label}</p>
-            </div>
+      {/* Recent Searches */}
+      {recentSearches.length > 0 && !report && !loading && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Clock className="w-4 h-4 text-text-muted" />
+          <span className="text-xs text-text-muted">{t("recent_searches", "Recent Searches")}:</span>
+          {recentSearches.map((q) => (
+            <button
+              key={q}
+              onClick={() => handleSearch(q)}
+              className="px-3 py-1 rounded-full text-xs bg-card-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald transition-all"
+            >
+              {q}
+            </button>
           ))}
         </div>
+      )}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl bg-primary-500/10 border border-primary-500/20">
-              <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
-              <span className="text-primary-300 font-medium">Analyzing with AI...</span>
-            </div>
+      {/* Loading */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-4 animate-fade-in-up">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-accent-emerald/20 border-t-accent-emerald rounded-full animate-spin" />
+            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-b-accent-cyan/30 rounded-full animate-spin-slow" />
           </div>
-        )}
+          <p className="text-text-muted text-sm">{t("loading_text", "Analyzing with AI...")}</p>
+        </div>
+      )}
 
-        {/* Error */}
-        {error && (
-          <div className="mt-6">
-            <NotificationBanner type="warning" message={`❌ ${error}`} />
-          </div>
-        )}
-
-        {/* Full Analysis Report */}
-        {report && !loading && (
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-surface-100">
-                Analysis Report: {report.product_name}
-              </h2>
-              <button
-                onClick={clearResults}
-                className="text-sm text-surface-200/50 hover:text-primary-300 transition-colors"
-              >
-                New search
-              </button>
-            </div>
-
-            {/* Score Card */}
-            <SustainabilityScoreCard
-              score={report.score}
-              tier={report.tier}
-              badge={report.badge}
-              productName={`${report.product_name}${report.brand ? ` — ${report.brand}` : ""}`}
+      {/* Report */}
+      {report && !loading && (
+        <div className="space-y-6 animate-fade-in-up">
+          {/* Notification */}
+          {report.tier === "RED" && (
+            <NotificationBanner
+              type="warning"
+              message={pc.impactWarning}
             />
-
-            {/* Carbon Footprint */}
-            <div className="glass-card p-5">
-              <p className="text-xs text-surface-200/40 uppercase tracking-wider mb-1">Carbon Footprint</p>
-              <p className="text-lg font-semibold text-surface-100">{report.carbon_footprint}</p>
-              {report.description && (
-                <p className="text-sm text-surface-200/50 mt-2">{report.description}</p>
-              )}
-            </div>
-
-            {/* Ingredient Breakdown */}
-            {report.ingredients_analysis && report.ingredients_analysis.length > 0 && (
-              <IngredientBreakdown
-                ingredients={report.ingredients_analysis.map((ing) => ({
-                  name: ing.name,
-                  score: ing.score,
-                  impact: ing.impact,
-                  sustainability: ing.sustainability,
-                }))}
-              />
-            )}
-
-            {/* Alternatives */}
-            {report.alternatives && report.alternatives.length > 0 && (
-              <AlternativesList
-                alternatives={report.alternatives.map((alt) => ({
-                  name: alt.name,
-                  score: alt.score,
-                  price: alt.price,
-                  reason: alt.reason,
-                }))}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Search Results (fallback if analyze returned multiple) */}
-        {searchResults && !loading && (
-          <div className="mt-8 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-surface-100">
-                Results ({searchResults.length})
-              </h2>
-              <button
-                onClick={clearResults}
-                className="text-sm text-surface-200/50 hover:text-primary-300 transition-colors"
-              >
-                Clear results
-              </button>
-            </div>
-            {searchResults.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => handleSearch(product.name)}
-                className="cursor-pointer hover:scale-[1.01] transition-transform duration-300"
-              >
-                <SustainabilityScoreCard
-                  score={product.score}
-                  tier={product.tier}
-                  badge={product.badge}
-                  productName={`${product.name}${product.brand ? ` — ${product.brand}` : ""}`}
-                  compact
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Recent Searches — only when no results */}
-        {!searchResults && !report && !loading && (
-          <div className="mt-8 animate-fade-in-up stagger-3" style={{ opacity: 0 }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="w-4 h-4 text-surface-200/40" />
-              <span className="text-sm text-surface-200/40">Recent Searches</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {mockRecentSearches.map((term) => (
-                <button
-                  key={term}
-                  onClick={() => handleSearch(term)}
-                  className="px-4 py-2 rounded-xl bg-surface-800/50 border border-surface-700/30 text-sm text-surface-200/60 hover:text-primary-300 hover:border-primary-500/30 transition-all duration-300"
-                >
-                  {term}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Notification */}
-        {!loading && !report && (
-          <div className="mt-8 animate-fade-in-up stagger-4" style={{ opacity: 0 }}>
+          )}
+          {report.tier === "GREEN" && report.score >= 85 && (
             <NotificationBanner
               type="success"
-              message="🌍 Your average eco score this week is 78 — well above the community average of 62!"
+              message={t("notification", "🌍 Your average eco score this week is 78 — well above the community average of 62!")}
             />
+          )}
+
+          {/* Product Header */}
+          <div className="glass-card p-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-text-main">{report.product_name}</h2>
+              <div className="flex items-center gap-3 mt-1">
+                {report.brand && <span className="text-sm text-text-muted">{report.brand}</span>}
+                {report.category && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-card-bg/60 border border-text-muted/20 text-text-muted">
+                    {report.category}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAddToHistory}
+                disabled={addedToHistory}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  addedToHistory
+                    ? "bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30"
+                    : "bg-surface-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald"
+                }`}
+              >
+                {addedToHistory ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    {pc.added}
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    {pc.addHistory}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+
+          {/* Score Card */}
+          <SustainabilityScoreCard
+            score={report.score}
+            tier={report.tier}
+            badge={report.badge}
+            carbonFootprint={report.carbon_footprint}
+            description={report.description}
+          />
+
+          {/* Ingredients */}
+          <IngredientBreakdown ingredients={report.ingredients_analysis} />
+
+          {/* Alternatives */}
+          <AlternativesList alternatives={report.alternatives} />
+
+          {/* Actions */}
+          <div className="flex gap-3 justify-center pt-4">
+            <button
+              onClick={clearResults}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium bg-surface-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald transition-all duration-300"
+            >
+              {pc.newSearch}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

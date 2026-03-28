@@ -1,32 +1,48 @@
+import { Award, Lock } from "lucide-react";
+import useAIText from "../hooks/useAIText";
+
 export default function BadgeCard({ badge }) {
-  const { name, icon, description, earned, earnedDate } = badge;
+  const t = useAIText("profile");
+  const earned = badge?.earned ?? false;
 
   return (
     <div
-      className={`glass-card p-5 text-center transition-all duration-300 group ${
+      className={`glass-card p-4 flex flex-col items-center text-center transition-all duration-300 ${
         earned
-          ? "hover:border-primary-500/40 animate-pulse-glow"
-          : "opacity-40 grayscale hover:opacity-60"
+          ? "border-accent-emerald/30 hover:border-accent-emerald/50 hover:shadow-lg hover:shadow-accent-emerald/10"
+          : "opacity-40 grayscale hover:opacity-60 hover:grayscale-0"
       }`}
     >
-      <div
-        className={`text-4xl mb-3 transition-transform duration-300 ${
-          earned ? "group-hover:scale-110" : ""
+      {/* Icon */}
+      <div className="relative mb-3">
+        <span className="text-3xl">{badge?.icon || "🏅"}</span>
+        {!earned && (
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-surface-bg rounded-full flex items-center justify-center border border-card-bg">
+            <Lock className="w-2.5 h-2.5 text-text-muted" />
+          </div>
+        )}
+      </div>
+
+      {/* Name */}
+      <h4 className="text-sm font-medium text-text-main mb-1">{badge?.name || "Badge"}</h4>
+
+      {/* Status */}
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+          earned
+            ? "bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/20"
+            : "bg-surface-bg text-text-muted border border-card-bg"
         }`}
       >
-        {icon}
-      </div>
-      <h4 className="text-sm font-semibold text-surface-100 mb-1">{name}</h4>
-      <p className="text-xs text-surface-200/50 mb-2 leading-relaxed">{description}</p>
-      {earned ? (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-500/15 text-primary-300 border border-primary-500/20">
-          Earned {earnedDate}
-        </span>
-      ) : (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-surface-700/30 text-surface-200/40 border border-surface-700/30">
-          Locked
-        </span>
-      )}
+        {earned ? (
+          <>
+            <Award className="w-3 h-3" />
+            {t("earned_label", "Earned")}
+          </>
+        ) : (
+          t("locked_label", "Locked")
+        )}
+      </span>
     </div>
   );
 }

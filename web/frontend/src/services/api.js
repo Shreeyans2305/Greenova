@@ -1,6 +1,6 @@
 /**
- * GreenNova - API Service
- * Connects the React frontend to the FastAPI backend (Ollama + Gemma 3 12B).
+ * EcoTrack - API Service
+ * Connects the React frontend to the FastAPI backend (Ollama + Gemma 3).
  *
  * Flow:
  *   1. Try calling the real backend API.
@@ -16,8 +16,9 @@ const FORCE_MOCK = import.meta.env.VITE_MOCK_MODE === "true";
 // ---------- Helpers ----------
 
 async function apiFetch(path, options = {}) {
+  const timeout = options.timeout || 30000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout for AI calls
+  const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -36,7 +37,7 @@ async function apiFetch(path, options = {}) {
 
     return await res.json();
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timer);
   }
 }
 
@@ -45,7 +46,6 @@ async function apiFetch(path, options = {}) {
 function mockAnalyze(text) {
   const lower = (text || "").toLowerCase();
 
-  // Try to match a mock product by name/keyword
   const matched = mockProducts.find(
     (p) =>
       lower.includes(p.name.toLowerCase()) ||
@@ -104,11 +104,10 @@ function mockSearch(query) {
   return { type: "GENERALIZED", results };
 }
 
-// ---------- Public API ----------
+// ---------- Public API (existing) ----------
 
 /**
  * POST /api/analyze — Analyze a product's sustainability
- * Falls back to mock data when backend is unreachable.
  */
 export async function analyzeProduct({ text, image_b64, barcode } = {}) {
   if (FORCE_MOCK) {
@@ -128,7 +127,6 @@ export async function analyzeProduct({ text, image_b64, barcode } = {}) {
 
 /**
  * POST /api/search — Search products with sustainability scores
- * Falls back to mock data when backend is unreachable.
  */
 export async function searchProducts(query) {
   if (FORCE_MOCK) {
@@ -148,7 +146,6 @@ export async function searchProducts(query) {
 
 /**
  * GET /health — Check if backend + Ollama are reachable
- * @returns {{ status, mock_mode, model, ollama_url }}
  */
 export async function healthCheck() {
   if (FORCE_MOCK) {
@@ -177,12 +174,66 @@ export function fileToBase64(file) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      // Strip the data:image/...;base64, prefix
       const base64 = reader.result.split(",")[1];
       resolve(base64);
     };
     reader.onerror = (err) => reject(err);
   });
+}
+
+// ---------- New AI Content Endpoints ----------
+
+/**
+ * GET /api/ui-text?section=... — Fetch AI-generated UI strings
+ * Falls back to null if backend is unreachable (caller uses defaults).
+ */
+export async function fetchUIText(section) {
+  if (FORCE_MOCK) return null;
+
+  try {
+    return await apiFetch(`/api/ui-text?section=${encodeURIComponent(section)}`, {
+      timeout: 10000,
+    });
+  } catch (err) {
+    console.warn(`UI text fetch failed for section "${section}":`, err.message);
+    return null;
+  }
+}
+
+/**
+ * POST /api/calculator/score — AI-powered calculator scoring
+ */
+export async function fetchCalculatorScore(answers, totalCO2) {
+  if (FORCE_MOCK) return null;
+
+  try {
+    return await apiFetch("/api/calculator/score", {
+      method: "POST",
+      body: JSON.stringify({ answers, total_co2: totalCO2 }),
+      timeout: 15000,
+    });
+  } catch (err) {
+    console.warn("Calculator score fetch failed:", err.message);
+    return null;
+  }
+}
+
+/**
+ * POST /api/content/generate — Generic AI content generation
+ */
+export async function generateContent(contentType, context = "") {
+  if (FORCE_MOCK) return null;
+
+  try {
+    return await apiFetch("/api/content/generate", {
+      method: "POST",
+      body: JSON.stringify({ content_type: contentType, context }),
+      timeout: 10000,
+    });
+  } catch (err) {
+    console.warn("Content generation failed:", err.message);
+    return null;
+  }
 }
 
 export { API_BASE, FORCE_MOCK as MOCK_MODE };

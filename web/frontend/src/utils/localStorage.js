@@ -1,4 +1,4 @@
-// ===== LocalStorage Utility for GreenNova =====
+// ===== LocalStorage Utility for EcoTrack =====
 
 const HISTORY_KEY = "green_nova_history";
 const BADGES_KEY = "green_nova_badges";

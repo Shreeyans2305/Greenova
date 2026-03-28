@@ -1,4 +1,4 @@
-// ===== GreenNova Mock Data =====
+// ===== EcoTrack Mock Data =====
 // All hardcoded data for the frontend demo
 
 export const mockProducts = [
@@ -135,9 +135,9 @@ export const mockWeeklyTrend = [
 ];
 
 export const mockCategoryBreakdown = [
-  { category: "Household", avgScore: 73, count: 3, color: "#10b981" },
-  { category: "Personal Care", avgScore: 85, count: 4, color: "#06b6d4" },
-  { category: "Food & Beverage", avgScore: 60, count: 5, color: "#f59e0b" },
+  { category: "Household", avgScore: 73, count: 3, color: "#00D27F" },
+  { category: "Personal Care", avgScore: 85, count: 4, color: "#00BCD4" },
+  { category: "Food & Beverage", avgScore: 60, count: 5, color: "#F0B232" },
 ];
 
 export const mockBadges = [
@@ -158,10 +158,10 @@ export const mockRecentSearches = [
 
 export function getTierColor(tier) {
   switch (tier) {
-    case "GREEN": return { text: "#10b981", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" };
-    case "AMBER": return { text: "#f59e0b", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)" };
-    case "RED": return { text: "#ef4444", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)" };
-    default: return { text: "#94a3b8", bg: "rgba(148, 163, 184, 0.15)", border: "rgba(148, 163, 184, 0.3)" };
+    case "GREEN": return { text: "#00D27F", bg: "rgba(0, 210, 127, 0.15)", border: "rgba(0, 210, 127, 0.3)" };
+    case "AMBER": return { text: "#F0B232", bg: "rgba(240, 178, 50, 0.15)", border: "rgba(240, 178, 50, 0.3)" };
+    case "RED": return { text: "#F24E4E", bg: "rgba(242, 78, 78, 0.15)", border: "rgba(242, 78, 78, 0.3)" };
+    default: return { text: "#9898B0", bg: "rgba(152, 152, 176, 0.15)", border: "rgba(152, 152, 176, 0.3)" };
   }
 }
 

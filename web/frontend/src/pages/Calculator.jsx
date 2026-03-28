@@ -1,205 +1,283 @@
 import { useState } from "react";
-import { MoveRight, Loader2, Sparkles, UserX, RefreshCw } from "lucide-react";
-import { calculatorQuestions, BASE_IMPACT } from "../data/calculatorData";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Calculator as CalcIcon,
+  Leaf,
+  Car,
+  Home,
+  Utensils,
+  ShoppingBag,
+  Recycle,
+  Plane,
+  SkipForward,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
+import { calculatorQuestions as questions, BASE_IMPACT } from "../data/calculatorData";
+import useAIText from "../hooks/useAIText";
+import useCalculatorInsights from "../hooks/useCalculatorInsights";
+import NotificationBanner from "../components/NotificationBanner";
+
+const ICONS = [Leaf, Car, Home, Utensils, ShoppingBag, Recycle, Plane];
 
 export default function Calculator() {
-  const [currentStep, setCurrentStep] = currentStepInit();
+  const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [isCalculated, setIsCalculated] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [skipMode, setSkipMode] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [skipped, setSkipped] = useState(false);
 
-  function currentStepInit() {
-    return useState(0);
-  }
+  const t = useAIText("calculator");
+  const { insights, isLoading: insightsLoading, fetchInsights, reset: resetInsights } = useCalculatorInsights();
 
-  const handleSelectOption = (value) => {
-    setAnswers({ ...answers, [currentStep]: value });
-    nextStep();
+  const currentQ = questions[step];
+  const Icon = ICONS[step] || Leaf;
+  const progress = ((step + 1) / questions.length) * 100;
+
+  const calculateCO2 = () => {
+    let total = BASE_IMPACT;
+    questions.forEach((q, i) => {
+      const val = answers[i] ?? q.options[0].value;
+      total += val;
+    });
+    return Math.round(total * 100) / 100;
   };
 
-  const nextStep = () => {
-    if (currentStep < calculatorQuestions.length - 1) {
-      setCurrentStep(currentStep + 1);
+  const handleSelect = async (value) => {
+    const updated = { ...answers, [step]: value };
+    setAnswers(updated);
+
+    if (step < questions.length - 1) {
+      setStep(step + 1);
     } else {
-      calculateResult();
+      setShowResult(true);
+      let total = BASE_IMPACT;
+      questions.forEach((q, i) => {
+        const val = updated[i] ?? q.options[0].value;
+        total += val;
+      });
+      total = Math.round(total * 100) / 100;
+      await fetchInsights(updated, total);
     }
   };
 
-  const skipQuestion = () => {
-    // Skipping assumes average or missing value (0 for math ease, though 
-    // real models might assume average). We'll assume median impacts later.
-    setAnswers({ ...answers, [currentStep]: null });
-    nextStep();
+  const handleSkip = () => {
+    setSkipped(true);
+    setShowResult(true);
   };
 
-  const skipCalculator = () => {
-    setSkipMode(true);
-    calculateResult();
-  };
-
-  const calculateResult = () => {
-    setIsCalculating(true);
-    setTimeout(() => {
-      setIsCalculated(true);
-      setIsCalculating(false);
-    }, 1200); // simulate calculation time
-  };
-
-  const restart = () => {
-    setCurrentStep(0);
+  const handleRecalculate = () => {
+    setStep(0);
     setAnswers({});
-    setIsCalculated(false);
-    setSkipMode(false);
+    setShowResult(false);
+    setSkipped(false);
+    resetInsights();
   };
 
-  const calculateFinalScore = () => {
-    let total = BASE_IMPACT;
-    Object.values(answers).forEach((val) => {
-      // If skipped, we might assign a default median (e.g., 1.5).
-      total += val !== null ? val : 1.5; 
-    });
-    return total.toFixed(1);
-  };
+  const totalCO2 = calculateCO2();
 
-  // Result View
-  if (isCalculated) {
-    const finalScore = calculateFinalScore();
-    let badge = "";
-    let color = "";
-
-    if (skipMode) {
-      badge = "Unknown Impact";
-      color = "text-surface-300";
-    } else if (finalScore < 6) {
+  // Determine badge and color (fallback or from AI)
+  let badge, badgeColor;
+  if (insights) {
+    badge = insights.badge;
+    badgeColor = insights.badge_color;
+  } else {
+    if (totalCO2 < 6) {
       badge = "Eco Champion 🌿";
-      color = "text-accent-400";
-    } else if (finalScore < 10) {
+      badgeColor = "green";
+    } else if (totalCO2 < 10) {
       badge = "Conscious Citizen 🌎";
-      color = "text-primary-400";
+      badgeColor = "yellow";
     } else {
       badge = "Needs Improvement 🏭";
-      color = "text-danger-400";
+      badgeColor = "red";
     }
+  }
 
+  const badgeStyles = {
+    green: "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/20",
+    yellow: "bg-warn-500/15 text-warn-400 border-warn-500/20",
+    red: "bg-danger-500/15 text-danger-400 border-danger-500/20",
+  };
+
+  // Result view
+  if (showResult) {
     return (
-      <div className="min-h-screen pt-24 px-4 sm:px-6 lg:px-8 pb-12 flex flex-col items-center">
-        <div className="max-w-md w-full glass-card p-8 text-center animate-fade-in-up">
-          <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary-500/10 mb-6">
-            <Sparkles className="w-8 h-8 text-primary-400" />
-          </div>
-          
-          <h2 className="text-2xl font-bold text-surface-100 mb-2">Your Carbon Footprint</h2>
-          
-          {skipMode ? (
-            <div className="py-8">
-               <UserX className="w-12 h-12 text-surface-200/50 mx-auto mb-4" />
-               <p className="text-surface-200/70">You skipped the calculator. We couldn't calculate your accurate footprint.</p>
+      <main className="max-w-2xl mx-auto px-4 pt-24 pb-16 animate-fade-in-up">
+        <div className="glass-card p-8 text-center space-y-6">
+          <CalcIcon className="w-12 h-12 text-accent-emerald mx-auto" />
+          <h1 className="text-3xl font-bold text-text-main">
+            {t("result_title", "Your Carbon Footprint")}
+          </h1>
+
+          {skipped ? (
+            <div className="space-y-4">
+              <p className="text-text-muted">
+                {t("skip_message", "You skipped the calculator. We couldn't calculate your accurate footprint.")}
+              </p>
+              <button
+                onClick={handleRecalculate}
+                className="flex items-center gap-2 mx-auto px-6 py-3 bg-accent-emerald text-page-bg rounded-xl text-sm font-medium hover:bg-accent-emerald-dark transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {t("recalculate", "Recalculate")}
+              </button>
             </div>
           ) : (
-            <>
-              <div className="py-6">
-                <p className="text-5xl font-black bg-linear-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
-                  {finalScore}
-                </p>
-                <p className="text-sm text-surface-200/60 mt-2">Tons of CO2 per year</p>
+            <div className="space-y-6">
+              {/* CO2 Display */}
+              <div className="relative">
+                <div className="text-6xl font-bold text-text-main">{totalCO2}</div>
+                <div className="text-sm text-text-muted mt-1">{t("co2_unit", "Tons of CO2 per year")}</div>
               </div>
-              <div className="py-3 px-4 rounded-xl bg-surface-800/50 border border-surface-700/50 mb-8 inline-block">
-                <span className={`font-semibold ${color}`}>{badge}</span>
-              </div>
-            </>
+
+              {/* Badge */}
+              <span
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${badgeStyles[badgeColor] || badgeStyles.yellow}`}
+              >
+                {badge}
+              </span>
+
+              {/* AI Insights */}
+              {insightsLoading && (
+                <div className="flex items-center justify-center gap-2 text-text-muted text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t("calculating", "Calculating your impact...")}
+                </div>
+              )}
+
+              {insights && (
+                <div className="space-y-4 text-left">
+                  {/* Comparison */}
+                  {insights.comparison && (
+                    <NotificationBanner
+                      type={totalCO2 < 4.5 ? "success" : "warning"}
+                      message={insights.comparison}
+                    />
+                  )}
+
+                  {/* Insights */}
+                  {insights.insights?.length > 0 && (
+                    <div className="glass-card-light p-4 space-y-2">
+                      <h3 className="text-sm font-semibold text-text-main flex items-center gap-2">
+                        <Leaf className="w-4 h-4 text-accent-emerald" />
+                        Insights
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {insights.insights.map((insight, i) => (
+                          <li key={i} className="text-sm text-text-muted flex items-start gap-2">
+                            <span className="text-accent-emerald mt-0.5">•</span>
+                            {insight}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Tips */}
+                  {insights.tips?.length > 0 && (
+                    <div className="glass-card-light p-4 space-y-2">
+                      <h3 className="text-sm font-semibold text-text-main flex items-center gap-2">
+                        <Recycle className="w-4 h-4 text-accent-cyan" />
+                        Tips to Reduce
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {insights.tips.map((tip, i) => (
+                          <li key={i} className="text-sm text-text-muted flex items-start gap-2">
+                            <span className="text-accent-cyan mt-0.5">•</span>
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recalculate */}
+              <button
+                onClick={handleRecalculate}
+                className="flex items-center gap-2 mx-auto px-6 py-3 bg-surface-bg text-text-muted rounded-xl text-sm font-medium border border-card-bg hover:border-accent-emerald/30 hover:text-accent-emerald transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {t("recalculate", "Recalculate")}
+              </button>
+            </div>
           )}
-
-          <button
-            onClick={restart}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-700 hover:bg-surface-600 border border-surface-600/50 text-surface-100 transition-all font-medium"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Recalculate
-          </button>
         </div>
-      </div>
+      </main>
     );
   }
 
-  // Loading View
-  if (isCalculating) {
-    return (
-      <div className="min-h-screen pt-32 px-4 flex justify-center">
-        <div className="text-center animate-pulse">
-          <Loader2 className="w-10 h-10 text-primary-400 animate-spin mx-auto mb-4" />
-          <h2 className="text-xl font-medium text-surface-100">Calculating your impact...</h2>
-          <p className="text-surface-200/50 mt-2"> crunching the numbers </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Questionnaire View
-  const question = calculatorQuestions[currentStep];
-  const progressPercent = ((currentStep + 1) / calculatorQuestions.length) * 100;
-
+  // Question view
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        
-        {/* Progress header & Skip all */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="w-full max-w-xs">
-            <div className="flex justify-between text-xs text-surface-200/60 mb-2 font-medium tracking-wide">
-              <span>Question {currentStep + 1} of {calculatorQuestions.length}</span>
-              <span>{Math.round(progressPercent)}%</span>
-            </div>
-            <div className="h-1.5 w-full bg-surface-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-linear-to-r from-primary-500 to-accent-500 transition-all duration-500 ease-out"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+    <main className="max-w-2xl mx-auto px-4 pt-24 pb-16 animate-fade-in-up">
+      <div className="space-y-8">
+        {/* Progress */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-text-muted">
+            <span>{t("question_of", "Question {current} of {total}").replace("{current}", step + 1).replace("{total}", questions.length)}</span>
+            <span>{Math.round(progress)}%</span>
           </div>
-          <button 
-            onClick={skipCalculator}
-            className="text-sm font-medium text-surface-200/50 hover:text-surface-100 transition-colors"
-          >
-            Skip Calculator
-          </button>
+          <div className="h-1.5 bg-surface-bg border border-card-bg rounded-full overflow-hidden">
+            <div
+              className="h-full bg-linear-to-r from-accent-emerald to-accent-cyan rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
         {/* Question Card */}
-        <div className="glass-card p-6 sm:p-10 animate-fade-in-up" key={currentStep}>
-          <h2 className="text-2xl sm:text-3xl font-bold text-surface-100 mb-8 text-center">
-            {question.title}
-          </h2>
+        <div className="glass-card p-8 text-center space-y-6">
+          <Icon className="w-12 h-12 text-accent-emerald mx-auto" />
+          <h2 className="text-2xl font-bold text-text-main">{currentQ.question}</h2>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {question.options.map((option, idx) => (
+          <div className="grid gap-3">
+            {currentQ.options.map((opt, idx) => (
               <button
                 key={idx}
-                onClick={() => handleSelectOption(option.value)}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-surface-800/40 border border-surface-700/50 hover:bg-surface-700/60 hover:border-primary-500/40 transition-all duration-300 group text-left"
+                onClick={() => handleSelect(opt.value)}
+                className="glass-card-light p-4 text-left hover:border-accent-emerald/40 hover:bg-accent-emerald/5 transition-all duration-300 group"
               >
-                <span className="text-3xl group-hover:scale-110 transition-transform duration-300">
-                  {option.icon}
-                </span>
-                <span className="font-medium text-surface-100 group-hover:text-primary-300 transition-colors">
-                  {option.label}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-main group-hover:text-accent-emerald transition-colors">
+                    {opt.label}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent-emerald group-hover:translate-x-1 transition-all" />
+                </div>
               </button>
             ))}
           </div>
+        </div>
 
-          <div className="mt-8 flex justify-center">
+        {/* Nav */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => step > 0 && setStep(step - 1)}
+            disabled={step === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-text-muted hover:text-text-main disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="flex items-center gap-3">
             <button
-              onClick={skipQuestion}
-              className="group inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-surface-700 hover:border-surface-600 hover:bg-surface-800 text-surface-200/70 hover:text-surface-100 transition-all text-sm font-medium"
+              onClick={() => handleSelect(currentQ.options[0].value)}
+              className="text-xs text-text-muted hover:text-text-main transition-all"
             >
-              Skip this question
-              <MoveRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {t("skip_question", "Skip this question")}
+            </button>
+            <button
+              onClick={handleSkip}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-text-muted border border-surface-bg hover:text-warn-400 hover:border-warn-500/30 transition-all"
+            >
+              <SkipForward className="w-4 h-4" />
+              {t("skip_calculator", "Skip Calculator")}
             </button>
           </div>
         </div>
-
       </div>
-    </div>
+    </main>
   );
 }

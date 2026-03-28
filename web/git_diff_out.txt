@@ -1,0 +1,3389 @@
+diff --git a/web/backend/.env.example b/web/backend/.env.example
+index 026cb20..ef7eee8 100644
+--- a/web/backend/.env.example
++++ b/web/backend/.env.example
+@@ -2,8 +2,10 @@
+ # Copy to .env: cp .env.example .env
+ 
+ OLLAMA_URL=http://localhost:11434
+-MODEL_NAME=gemma3:12b
++MODEL_NAME=gemma3:latest
+ MOCK_MODE=true
++CACHE_TTL=3600
++CACHE_ENABLED=true
+ HOST=0.0.0.0
+ PORT=8000
+ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+diff --git a/web/backend/ai_service.py b/web/backend/ai_service.py
+index 2217a84..ae40e50 100644
+--- a/web/backend/ai_service.py
++++ b/web/backend/ai_service.py
+@@ -1,10 +1,8 @@
+ """
+ GreenNova Backend - AI Service
+-Centralized AI interaction layer. Calls Ollama (Gemma 3 12B) for live analysis,
++Centralized AI interaction layer. Calls Ollama (Gemma 3) for live analysis,
+ or returns mock data when MOCK_MODE is enabled.
+-
+-Toggle: Set MOCK_MODE=true in .env to use hardcoded responses (faster dev).
+-        Set MOCK_MODE=false to call Ollama locally for real AI analysis.
++All responses are cached with TTL to reduce API calls.
+ """
+ 
+ import json
+@@ -21,8 +19,12 @@ from models import (
+     Alternative,
+     SearchResponse,
+     SearchResultItem,
++    UITextResponse,
++    CalculatorScoreResponse,
++    ContentGenerateResponse,
+ )
+-from mock_data import get_mock_report, get_mock_search
++from mock_data import get_mock_report, get_mock_search, get_fallback_ui_text, get_fallback_calculator, FALLBACK_UI_TEXT
++from cache_service import cache, CacheService
+ 
+ logger = logging.getLogger("greennova.ai_service")
+ 
+@@ -96,40 +98,89 @@ as a standard product analysis with: product_name, brand, category, score, tier,
+ carbon_footprint, description, ingredients_analysis, and alternatives.
+ """
+ 
++UI_TEXT_PROMPT = """You are GreenNova, generating English UI text for a sustainability web app.
++Rewrite the default UI text for the "{section}" section to make it more engaging and sustainability-focused.
++
++You MUST respond with valid JSON only, no markdown fences.
++The JSON must contain short, natural English strings for each UI element.
++
++Section: {section}
++Default text to rewrite (maintain these exact JSON keys):
++{keys}
++
++IMPORTANT RULES:
++1. Maintain exactly the same JSON keys.
++2. If a value contains placeholder variables like {{average_score}} or {{earned}}, you MUST keep them exactly as they are. Do not invent new placeholders.
++3. Keep text concise and friendly.
++4. Do NOT include any markdown or code fences in your response.
++"""
++
++CALCULATOR_PROMPT = """You are GreenNova, an environmental sustainability expert.
++A user completed a carbon footprint calculator with these results:
++- Total CO2 emissions: {total_co2} tons/year
++- Answers: {answers}
++
++Provide personalized insights about their carbon footprint.
++
++You MUST respond with valid JSON only, no markdown fences:
++{{
++  "badge": "A short badge name (e.g. 'Eco Champion 🌿', 'Conscious Citizen 🌎', 'Needs Improvement 🏭')",
++  "badge_color": "green" | "yellow" | "red",
++  "insights": ["2-3 short personalized insights about their footprint"],
++  "tips": ["2-3 actionable tips to reduce their footprint"],
++  "comparison": "A brief sentence comparing to average (world avg ~4.5 tons/year)"
++}}
++"""
++
++CONTENT_PROMPT = """You are GreenNova, generating engaging content for a sustainability web app.
++Generate a {content_type} message.
++Context: {context}
++
++You MUST respond with valid JSON only, no markdown fences:
++{{
++  "text": "The generated content text"
++}}
++"""
++
+ 
+ # ===== Helper: Parse AI Response =====
+ 
+ def _parse_json_response(raw: str) -> dict:
+     """Extract JSON from a model response, stripping markdown fences if present."""
+-    # Strip markdown code fences
+     cleaned = re.sub(r"```(?:json)?\s*", "", raw)
+     cleaned = cleaned.strip().rstrip("`")
+     return json.loads(cleaned)
+ 
+ 
+-# ===== Core Functions =====
++def _call_ollama(prompt: str, temperature: float = 0.3) -> str:
++    """Call Ollama and return the raw response content."""
++    response = ollama.chat(
++        model=MODEL_NAME,
++        messages=[{"role": "user", "content": prompt}],
++        options={"temperature": temperature},
++    )
++    return response["message"]["content"]
++
++
++# ===== Core Functions (existing, now with cache) =====
+ 
+ async def analyze_product_text(text: str) -> SustainabilityReport:
+-    """
+-    Analyze product text (name, ingredients, barcode) and return a sustainability report.
+-    Uses mock data when MOCK_MODE=true, otherwise calls Ollama/Gemma 3.
+-    """
++    """Analyze product text and return a sustainability report. Cached."""
+     if MOCK_MODE:
+         logger.info("[MOCK] Returning mock analyze report for: %s", text[:50])
+         return get_mock_report(text)
+ 
+-    # TODO: replace with Ollama call — this is the LIVE path
++    cache_key = CacheService.make_key("analyze_text", text)
++    cached = cache.get(cache_key)
++    if cached:
++        logger.info("[CACHE HIT] analyze_text: %s", text[:50])
++        return SustainabilityReport(**cached)
++
+     try:
+         logger.info("[LIVE] Calling Ollama (%s) for text analysis: %s", MODEL_NAME, text[:50])
+-        response = ollama.chat(
+-            model=MODEL_NAME,
+-            messages=[
+-                {"role": "user", "content": ANALYZE_PROMPT.format(product_info=text)}
+-            ],
+-            options={"temperature": 0.3},
+-        )
+-        raw = response["message"]["content"]
++        raw = _call_ollama(ANALYZE_PROMPT.format(product_info=text))
+         data = _parse_json_response(raw)
++        cache.set(cache_key, data)
+         return SustainabilityReport(**data)
+     except Exception as e:
+         logger.error("Ollama analyze failed: %s. Falling back to mock.", e)
+@@ -137,18 +188,13 @@ async def analyze_product_text(text: str) -> SustainabilityReport:
+ 
+ 
+ async def analyze_product_image(image_b64: str, text: Optional[str] = None) -> SustainabilityReport:
+-    """
+-    Analyze a product image (base64 encoded) and return a sustainability report.
+-    Gemma 3 supports multimodal (text + image) inputs.
+-    """
++    """Analyze a product image (base64) and return a sustainability report."""
+     if MOCK_MODE:
+         logger.info("[MOCK] Returning mock analyze report for image upload")
+         return get_mock_report(text)
+ 
+-    # TODO: replace with Ollama call — this is the LIVE path
+     try:
+         logger.info("[LIVE] Calling Ollama (%s) for image analysis", MODEL_NAME)
+-
+         messages = [{"role": "user", "content": IMAGE_ANALYZE_PROMPT, "images": [image_b64]}]
+         if text:
+             messages[0]["content"] += f"\n\nAdditional context: {text}"
+@@ -167,26 +213,114 @@ async def analyze_product_image(image_b64: str, text: Optional[str] = None) -> S
+ 
+ 
+ async def search_products(query: str) -> SearchResponse:
+-    """
+-    Search for products by name/category and return sustainability-scored results.
+-    """
++    """Search for products and return sustainability-scored results. Cached."""
+     if MOCK_MODE:
+         logger.info("[MOCK] Returning mock search results for: %s", query[:50])
+         return get_mock_search(query)
+ 
+-    # TODO: replace with Ollama call — this is the LIVE path
++    cache_key = CacheService.make_key("search", query)
++    cached = cache.get(cache_key)
++    if cached:
++        logger.info("[CACHE HIT] search: %s", query[:50])
++        return SearchResponse(**cached)
++
+     try:
+         logger.info("[LIVE] Calling Ollama (%s) for search: %s", MODEL_NAME, query[:50])
+-        response = ollama.chat(
+-            model=MODEL_NAME,
+-            messages=[
+-                {"role": "user", "content": SEARCH_PROMPT.format(query=query)}
+-            ],
+-            options={"temperature": 0.5},
+-        )
+-        raw = response["message"]["content"]
++        raw = _call_ollama(SEARCH_PROMPT.format(query=query), temperature=0.5)
+         data = _parse_json_response(raw)
++        cache.set(cache_key, data)
+         return SearchResponse(**data)
+     except Exception as e:
+         logger.error("Ollama search failed: %s. Falling back to mock.", e)
+         return get_mock_search(query)
++
++
++# ===== New AI Functions =====
++
++async def generate_ui_text(section: str) -> UITextResponse:
++    """Generate UI text for a specific section. Cached with TTL."""
++    cache_key = CacheService.make_key("ui_text", section)
++    cached = cache.get(cache_key)
++    if cached:
++        logger.info("[CACHE HIT] ui_text: %s", section)
++        return UITextResponse(section=section, content=cached, cached=True)
++
++    if MOCK_MODE:
++        content = get_fallback_ui_text(section)
++        return UITextResponse(section=section, content=content, cached=False)
++
++    default_text = get_fallback_ui_text(section)
++    keys = json.dumps(default_text, indent=2)
++
++    try:
++        logger.info("[LIVE] Generating UI text for section: %s", section)
++        raw = _call_ollama(
++            UI_TEXT_PROMPT.format(section=section, keys=keys),
++            temperature=0.4,
++        )
++        data = _parse_json_response(raw)
++        cache.set(cache_key, data)
++        return UITextResponse(section=section, content=data, cached=False)
++    except Exception as e:
++        logger.error("UI text generation failed for %s: %s. Using fallback.", section, e)
++        content = get_fallback_ui_text(section)
++        return UITextResponse(section=section, content=content, cached=False)
++
++
++async def generate_calculator_insights(answers: dict, total_co2: float) -> CalculatorScoreResponse:
++    """Generate AI-powered calculator scoring and insights. Cached."""
++    cache_key = CacheService.make_key("calculator", answers, total_co2)
++    cached = cache.get(cache_key)
++    if cached:
++        logger.info("[CACHE HIT] calculator insights")
++        return CalculatorScoreResponse(**cached)
++
++    if MOCK_MODE:
++        return get_fallback_calculator(total_co2)
++
++    try:
++        logger.info("[LIVE] Generating calculator insights (CO2: %s)", total_co2)
++        raw = _call_ollama(
++            CALCULATOR_PROMPT.format(total_co2=total_co2, answers=json.dumps(answers)),
++            temperature=0.5,
++        )
++        data = _parse_json_response(raw)
++        data["total_co2"] = total_co2
++        cache.set(cache_key, data)
++        return CalculatorScoreResponse(**data)
++    except Exception as e:
++        logger.error("Calculator insights failed: %s. Using fallback.", e)
++        return get_fallback_calculator(total_co2)
++
++
++async def generate_content(content_type: str, context: str) -> ContentGenerateResponse:
++    """Generate generic content (notifications, tips, errors). Cached."""
++    cache_key = CacheService.make_key("content", content_type, context)
++    cached = cache.get(cache_key)
++    if cached:
++        return ContentGenerateResponse(content_type=content_type, text=cached, cached=True)
++
++    if MOCK_MODE:
++        return ContentGenerateResponse(
++            content_type=content_type,
++            text=f"Sample {content_type}: {context}",
++            cached=False,
++        )
++
++    try:
++        logger.info("[LIVE] Generating content: %s", content_type)
++        raw = _call_ollama(
++            CONTENT_PROMPT.format(content_type=content_type, context=context),
++            temperature=0.6,
++        )
++        data = _parse_json_response(raw)
++        text = data.get("text", str(data))
++        cache.set(cache_key, text)
++        return ContentGenerateResponse(content_type=content_type, text=text, cached=False)
++    except Exception as e:
++        logger.error("Content generation failed: %s", e)
++        return ContentGenerateResponse(
++            content_type=content_type,
++            text=f"Sample {content_type}: {context}",
++            cached=False,
++        )
+diff --git a/web/backend/config.py b/web/backend/config.py
+index b257f2b..6016683 100644
+--- a/web/backend/config.py
++++ b/web/backend/config.py
+@@ -10,9 +10,13 @@ load_dotenv()
+ 
+ # --- Ollama / AI Settings ---
+ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+-MODEL_NAME = os.getenv("MODEL_NAME", "gemma3:12b")
++MODEL_NAME = os.getenv("MODEL_NAME", "gemma3:latest")
+ MOCK_MODE = os.getenv("MOCK_MODE", "true").lower() == "true"
+ 
++# --- Cache Settings ---
++CACHE_TTL = int(os.getenv("CACHE_TTL", "3600"))  # seconds (default 1 hour)
++CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
++
+ # --- Server Settings ---
+ HOST = os.getenv("HOST", "0.0.0.0")
+ PORT = int(os.getenv("PORT", "8000"))
+diff --git a/web/backend/main.py b/web/backend/main.py
+index a22630b..62c7e0b 100644
+--- a/web/backend/main.py
++++ b/web/backend/main.py
+@@ -6,18 +6,32 @@ Main entry point with CORS, routes, and health check.
+ import logging
+ from contextlib import asynccontextmanager
+ 
+-from fastapi import FastAPI, HTTPException
++from fastapi import FastAPI, HTTPException, Query
+ from fastapi.middleware.cors import CORSMiddleware
+ 
+-from config import CORS_ORIGINS, MOCK_MODE, MODEL_NAME, OLLAMA_URL, HOST, PORT, LOG_LEVEL
++from config import CORS_ORIGINS, MOCK_MODE, MODEL_NAME, OLLAMA_URL, HOST, PORT, LOG_LEVEL, CACHE_ENABLED, CACHE_TTL
+ from models import (
+     AnalyzeRequest,
+     SearchRequest,
++    CalculatorScoreRequest,
++    ProductGenerateRequest,
++    ContentGenerateRequest,
+     SustainabilityReport,
+     SearchResponse,
+     HealthResponse,
++    UITextResponse,
++    CalculatorScoreResponse,
++    ContentGenerateResponse,
+ )
+-from ai_service import analyze_product_text, analyze_product_image, search_products
++from ai_service import (
++    analyze_product_text,
++    analyze_product_image,
++    search_products,
++    generate_ui_text,
++    generate_calculator_insights,
++    generate_content,
++)
++from cache_service import cache
+ 
+ # --- Logging setup ---
+ logging.basicConfig(
+@@ -36,6 +50,7 @@ async def lifespan(app: FastAPI):
+     logger.info("  MOCK_MODE  : %s", MOCK_MODE)
+     logger.info("  MODEL      : %s", MODEL_NAME)
+     logger.info("  OLLAMA_URL : %s", OLLAMA_URL)
++    logger.info("  CACHE      : %s (TTL=%ds)", CACHE_ENABLED, CACHE_TTL)
+     logger.info("  CORS       : %s", CORS_ORIGINS)
+     logger.info("=" * 60)
+     yield
+@@ -46,7 +61,7 @@ async def lifespan(app: FastAPI):
+ app = FastAPI(
+     title="GreenNova API",
+     description="AI-powered sustainability reports and eco-friendly product recommendations.",
+-    version="1.0.0",
++    version="2.0.0",
+     lifespan=lifespan,
+ )
+ 
+@@ -95,10 +110,8 @@ async def analyze_product(request: AnalyzeRequest):
+ 
+     try:
+         if request.image_b64:
+-            # Image analysis (multimodal)
+             report = await analyze_product_image(request.image_b64, request.text)
+         else:
+-            # Text-only analysis
+             input_text = request.text
+             if request.barcode:
+                 input_text += f" (barcode: {request.barcode})"
+@@ -115,10 +128,7 @@ async def analyze_product(request: AnalyzeRequest):
+ 
+ @app.post("/api/search", response_model=SearchResponse, tags=["Search"])
+ async def search(request: SearchRequest):
+-    """
+-    Search for products and get sustainability-rated results.
+-    Uses Ollama for live searches, or returns mock data in MOCK_MODE.
+-    """
++    """Search for products and get sustainability-rated results."""
+     if not request.query or not request.query.strip():
+         raise HTTPException(status_code=400, detail="'query' must not be empty.")
+ 
+@@ -132,6 +142,59 @@ async def search(request: SearchRequest):
+         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+ 
+ 
++# ===== New AI Content Endpoints =====
++
++@app.get("/api/ui-text", response_model=UITextResponse, tags=["AI Content"])
++async def get_ui_text(section: str = Query(..., description="UI section: navbar, home, search, report, calculator, history, profile, ingredients, alternatives, chart, footer")):
++    """Fetch AI-generated UI strings for a specific section."""
++    try:
++        result = await generate_ui_text(section)
++        logger.info("UI Text → section=%s | cached=%s", section, result.cached)
++        return result
++    except Exception as e:
++        logger.error("UI text endpoint error: %s", e)
++        raise HTTPException(status_code=500, detail=f"UI text generation failed: {str(e)}")
++
++
++@app.post("/api/calculator/score", response_model=CalculatorScoreResponse, tags=["AI Content"])
++async def calculator_score(request: CalculatorScoreRequest):
++    """AI-powered calculator scoring with personalized insights."""
++    try:
++        result = await generate_calculator_insights(request.answers, request.total_co2)
++        logger.info("Calculator → CO2=%.1f | Badge=%s", result.total_co2, result.badge)
++        return result
++    except Exception as e:
++        logger.error("Calculator endpoint error: %s", e)
++        raise HTTPException(status_code=500, detail=f"Calculator scoring failed: {str(e)}")
++
++
++@app.post("/api/content/generate", response_model=ContentGenerateResponse, tags=["AI Content"])
++async def content_generate(request: ContentGenerateRequest):
++    """Generic AI content generation (notifications, tips, descriptions, errors)."""
++    try:
++        result = await generate_content(request.content_type, request.context)
++        logger.info("Content → type=%s | cached=%s", request.content_type, result.cached)
++        return result
++    except Exception as e:
++        logger.error("Content generate endpoint error: %s", e)
++        raise HTTPException(status_code=500, detail=f"Content generation failed: {str(e)}")
++
++
++# ===== Cache Management =====
++
++@app.delete("/api/cache", tags=["Cache"])
++async def clear_cache():
++    """Clear the AI response cache."""
++    count = cache.clear()
++    return {"message": f"Cache cleared ({count} entries removed)"}
++
++
++@app.get("/api/cache/stats", tags=["Cache"])
++async def cache_stats():
++    """Get cache statistics."""
++    return cache.stats()
++
++
+ # --- Run with: uvicorn main:app --reload ---
+ if __name__ == "__main__":
+     import uvicorn
+diff --git a/web/backend/mock_data.py b/web/backend/mock_data.py
+index 209fd33..b5575d5 100644
+--- a/web/backend/mock_data.py
++++ b/web/backend/mock_data.py
+@@ -1,7 +1,7 @@
+ """
+-GreenNova Backend - Mock Data
+-Hardcoded responses returned when MOCK_MODE is enabled.
+-These mirror the frontend mockData.js structure for consistency.
++GreenNova Backend - Mock / Fallback Data
++Hardcoded responses used as fallbacks when Ollama is unavailable.
++Also provides fallback UI text for all sections.
+ """
+ 
+ from models import (
+@@ -10,6 +10,7 @@ from models import (
+     Alternative,
+     SearchResultItem,
+     SearchResponse,
++    CalculatorScoreResponse,
+ )
+ 
+ 
+@@ -167,3 +168,139 @@ def get_mock_search(query: str) -> SearchResponse:
+     if not filtered:
+         filtered = MOCK_SEARCH_RESULTS.results  # fallback: return all
+     return SearchResponse(type="GENERALIZED", results=filtered)
++
++
++# ===== Fallback UI Text =====
++
++FALLBACK_UI_TEXT = {
++    "navbar": {
++        "brand": "GreenNova",
++        "home": "Home",
++        "calculator": "Calculator",
++        "history": "History",
++        "badges": "Badges",
++        "status_live": "Gemma 3 · Live",
++        "status_mock": "Backend Mock",
++        "status_offline": "Offline · Mock",
++        "status_connecting": "Connecting…",
++    },
++    "home": {
++        "badge_label": "AI-Powered Sustainability",
++        "hero_title_1": "Know Your Impact.",
++        "hero_title_2": "Choose Better.",
++        "hero_subtitle": "Paste ingredients, scan barcodes, or upload product labels — get instant sustainability reports powered by AI.",
++        "stat_products": "Products Analyzed",
++        "stat_score": "Avg Eco Score",
++        "stat_alternatives": "Alternatives Found",
++        "loading_text": "Analyzing with AI...",
++        "recent_searches": "Recent Searches",
++        "notification": "🌍 Your average eco score this week is 78 — well above the community average of 62!",
++    },
++    "search": {
++        "placeholder": "Search product name, ingredients, or barcode...",
++        "button": "Analyze",
++        "upload_text": "Drag & drop a product label image, or",
++        "upload_hint": "JPEG, PNG up to 10MB",
++        "browse": "browse",
++    },
++    "report": {
++        "back_button": "Back to search",
++        "carbon_label": "Carbon Footprint",
++        "add_history": "Add to History",
++        "added": "Added ✓",
++        "new_search": "New search",
++        "clear_results": "Clear results",
++        "impact_warning": "This product has a high environmental impact. Consider switching to one of the alternatives below.",
++    },
++    "calculator": {
++        "result_title": "Your Carbon Footprint",
++        "co2_unit": "Tons of CO2 per year",
++        "skip_message": "You skipped the calculator. We couldn't calculate your accurate footprint.",
++        "recalculate": "Recalculate",
++        "calculating": "Calculating your impact...",
++        "skip_calculator": "Skip Calculator",
++        "skip_question": "Skip this question",
++        "question_of": "Question {current} of {total}",
++    },
++    "history": {
++        "title": "Purchase History",
++        "subtitle": "Track your environmental footprint over time",
++        "clear_all": "Clear All",
++        "total_items": "Total Items",
++        "avg_score": "Avg Eco Score",
++        "categories": "Categories",
++        "this_month": "This Month",
++        "category_breakdown": "Category Breakdown",
++        "purchase_log": "Purchase Log",
++        "empty_state": "No purchases logged yet. Analyze a product and add it to your history!",
++        "good_score_msg": "🌱 Great job! Your average eco score is above 75. You're an Eco Champion!",
++        "bad_score_msg": "⚠️ Some of your recent purchases have high environmental impact. Check the alternatives!",
++    },
++    "profile": {
++        "title": "Eco Profile",
++        "subtitle": "Your sustainability journey at a glance",
++        "badges_earned": "Badges Earned",
++        "avg_score": "Avg Eco Score",
++        "products_scanned": "Products Scanned",
++        "day_streak": "Day Streak",
++        "your_badges": "Your Badges",
++        "progress_title": "Progress to Next Badge",
++        "earned_label": "Earned",
++        "locked_label": "Locked",
++        "great_badges_msg": "🏆 Amazing! You've earned {earned} out of {total} badges. Keep going!",
++        "low_score_msg": "🌿 Your average eco score is below 50. Try switching to eco-friendly alternatives to boost your score!",
++    },
++    "ingredients": {
++        "title": "Ingredient Analysis",
++        "sustainability_label": "Sustainability:",
++        "impact_label": "Impact:",
++    },
++    "alternatives": {
++        "title": "Eco-Friendly Alternatives",
++        "empty_state": "✨ This product is already a great eco choice! No better alternatives found.",
++    },
++    "chart": {
++        "default_title": "Carbon Footprint Trend",
++        "score_legend": "Eco Score",
++        "purchases_legend": "Purchases",
++        "score_tooltip": "Score",
++        "purchases_tooltip": "Purchases",
++    },
++    "footer": {
++        "branding": "🌱 GreenNova — Making sustainability accessible, one product at a time.",
++    },
++}
++
++
++def get_fallback_ui_text(section: str) -> dict:
++    """Return fallback UI text for a given section."""
++    return FALLBACK_UI_TEXT.get(section, {"text": f"Content for {section}"})
++
++
++def get_fallback_calculator(total_co2: float) -> CalculatorScoreResponse:
++    """Return fallback calculator response based on CO2 total."""
++    if total_co2 < 6:
++        badge = "Eco Champion 🌿"
++        badge_color = "green"
++    elif total_co2 < 10:
++        badge = "Conscious Citizen 🌎"
++        badge_color = "yellow"
++    else:
++        badge = "Needs Improvement 🏭"
++        badge_color = "red"
++
++    return CalculatorScoreResponse(
++        total_co2=total_co2,
++        badge=badge,
++        badge_color=badge_color,
++        insights=[
++            f"Your footprint of {total_co2} tons CO2/year is {'below' if total_co2 < 4.5 else 'above'} the world average of 4.5 tons.",
++            "Transportation and diet are typically the largest contributors to personal carbon footprints.",
++        ],
++        tips=[
++            "Consider using public transport or carpooling to reduce emissions.",
++            "Eating more plant-based meals can significantly lower your footprint.",
++            "Switch to renewable energy sources when possible.",
++        ],
++        comparison=f"Your footprint is {total_co2} tons/year vs. the world average of 4.5 tons/year.",
++    )
+diff --git a/web/backend/models.py b/web/backend/models.py
+index 9d0934c..c0b20c3 100644
+--- a/web/backend/models.py
++++ b/web/backend/models.py
+@@ -21,6 +21,24 @@ class SearchRequest(BaseModel):
+     query: str = Field(..., description="Search query — product name, category, or brand")
+ 
+ 
++class CalculatorScoreRequest(BaseModel):
++    """Request body for POST /api/calculator/score"""
++    answers: dict = Field(..., description="User answers keyed by question ID with numeric values")
++    total_co2: float = Field(..., description="Total calculated CO2 in tons")
++
++
++class ProductGenerateRequest(BaseModel):
++    """Request body for POST /api/products/generate"""
++    context: str = Field("general", description="Product category or context for generation")
++    count: int = Field(3, ge=1, le=10, description="Number of products to generate")
++
++
++class ContentGenerateRequest(BaseModel):
++    """Request body for POST /api/content/generate"""
++    content_type: str = Field(..., description="Type of content: 'notification', 'tip', 'description', 'error'")
++    context: str = Field("", description="Context for the content generation")
++
++
+ # ===== Response Models =====
+ 
+ class IngredientAnalysis(BaseModel):
+@@ -78,3 +96,27 @@ class HealthResponse(BaseModel):
+     mock_mode: bool
+     model: str
+     ollama_url: str
++
++
++class UITextResponse(BaseModel):
++    """Response for GET /api/ui-text"""
++    section: str
++    content: dict
++    cached: bool = False
++
++
++class CalculatorScoreResponse(BaseModel):
++    """Response for POST /api/calculator/score"""
++    total_co2: float
++    badge: str
++    badge_color: str
++    insights: list[str] = []
++    tips: list[str] = []
++    comparison: str = ""
++
++
++class ContentGenerateResponse(BaseModel):
++    """Response for POST /api/content/generate"""
++    content_type: str
++    text: str
++    cached: bool = False
+diff --git a/web/frontend/src/App.jsx b/web/frontend/src/App.jsx
+index fbe12de..265f3fb 100644
+--- a/web/frontend/src/App.jsx
++++ b/web/frontend/src/App.jsx
+@@ -1,34 +1,46 @@
+ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
++import { ThemeProvider } from "./context/ThemeContext";
+ import { ApiProvider } from "./context/ApiContext";
++import { ContentProvider } from "./context/ContentContext";
+ import Navbar from "./components/Navbar";
+ import Home from "./pages/Home";
+ import ReportDetail from "./pages/ReportDetail";
+ import History from "./pages/History";
+ import Profile from "./pages/Profile";
+ import Calculator from "./pages/Calculator";
++import useAIText from "./hooks/useAIText";
+ 
+-export default function App() {
++function AppFooter() {
++  const t = useAIText("footer");
+   return (
+-    <ApiProvider>
+-      <Router>
+-        <div className="min-h-screen">
+-          <Navbar />
+-          <Routes>
+-            <Route path="/" element={<Home />} />
+-            <Route path="/report/:id" element={<ReportDetail />} />
+-            <Route path="/history" element={<History />} />
+-            <Route path="/profile" element={<Profile />} />
+-            <Route path="/calculator" element={<Calculator />} />
+-          </Routes>
++    <footer className="py-8 text-center border-t border-text-muted/10">
++      <p className="text-xs text-text-muted/60">
++        {t("branding", "🌱 GreenNova — Making sustainability accessible, one product at a time.")}
++      </p>
++    </footer>
++  );
++}
+ 
+-          {/* Footer */}
+-          <footer className="py-8 text-center border-t border-surface-700/20">
+-            <p className="text-xs text-surface-200/30">
+-              🌱 GreenNova — Making sustainability accessible, one product at a time.
+-            </p>
+-          </footer>
+-        </div>
+-      </Router>
+-    </ApiProvider>
++export default function App() {
++  return (
++    <ThemeProvider>
++      <ApiProvider>
++        <ContentProvider>
++          <Router>
++            <div className="min-h-screen">
++              <Navbar />
++              <Routes>
++                <Route path="/" element={<Home />} />
++                <Route path="/report/:id" element={<ReportDetail />} />
++                <Route path="/history" element={<History />} />
++                <Route path="/profile" element={<Profile />} />
++                <Route path="/calculator" element={<Calculator />} />
++              </Routes>
++              <AppFooter />
++            </div>
++          </Router>
++        </ContentProvider>
++      </ApiProvider>
++    </ThemeProvider>
+   );
+ }
+diff --git a/web/frontend/src/components/AlternativesList.jsx b/web/frontend/src/components/AlternativesList.jsx
+index 8b89472..865d3b8 100644
+--- a/web/frontend/src/components/AlternativesList.jsx
++++ b/web/frontend/src/components/AlternativesList.jsx
+@@ -1,12 +1,15 @@
+ import { ArrowRight, Star } from "lucide-react";
++import useAIText from "../hooks/useAIText";
+ 
+ export default function AlternativesList({ alternatives }) {
++  const t = useAIText("alternatives");
++
+   if (!alternatives || alternatives.length === 0) {
+     return (
+       <div className="glass-card p-6">
+-        <h3 className="text-lg font-semibold text-surface-100 mb-3">Eco-Friendly Alternatives</h3>
+-        <p className="text-sm text-primary-300/70">
+-          ✨ This product is already a great eco choice! No better alternatives found.
++        <h3 className="text-lg font-semibold text-text-main mb-3">{t("title", "Eco-Friendly Alternatives")}</h3>
++        <p className="text-sm text-accent-emerald">
++          {t("empty_state", "✨ This product is already a great eco choice! No better alternatives found.")}
+         </p>
+       </div>
+     );
+@@ -14,28 +17,28 @@ export default function AlternativesList({ alternatives }) {
+ 
+   return (
+     <div className="glass-card p-6">
+-      <h3 className="text-lg font-semibold text-surface-100 mb-4">Eco-Friendly Alternatives</h3>
++      <h3 className="text-lg font-semibold text-text-main mb-4">{t("title", "Eco-Friendly Alternatives")}</h3>
+       <div className="grid gap-3">
+         {alternatives.map((alt, idx) => (
+           <div
+             key={idx}
+-            className="glass-card-light p-4 flex items-center justify-between group hover:border-primary-500/30 transition-all duration-300 cursor-pointer animate-fade-in-up"
++            className="glass-card-light p-4 flex items-center justify-between group hover:border-accent-emerald/30 transition-all duration-300 cursor-pointer animate-fade-in-up"
+             style={{ animationDelay: `${idx * 0.1}s`, opacity: 0 }}
+           >
+             <div className="flex-1">
+               <div className="flex items-center gap-2">
+-                <span className="text-sm font-medium text-surface-100">{alt.name}</span>
+-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-500/15 text-primary-300 border border-primary-500/20">
++                <span className="text-sm font-medium text-text-main">{alt.name}</span>
++                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/20">
+                   <Star className="w-3 h-3" />
+                   {alt.score}
+                 </span>
+               </div>
+-              <p className="text-xs text-surface-200/50 mt-1">{alt.reason}</p>
++              <p className="text-xs text-text-muted mt-1">{alt.reason}</p>
+               {alt.price && (
+-                <span className="text-xs text-accent-400 mt-1 inline-block">{alt.price}</span>
++                <span className="text-xs text-accent-cyan mt-1 inline-block">{alt.price}</span>
+               )}
+             </div>
+-            <ArrowRight className="w-4 h-4 text-surface-200/30 group-hover:text-primary-400 group-hover:translate-x-1 transition-all duration-300" />
++            <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-accent-emerald group-hover:translate-x-1 transition-all duration-300" />
+           </div>
+         ))}
+       </div>
+diff --git a/web/frontend/src/components/BadgeCard.jsx b/web/frontend/src/components/BadgeCard.jsx
+index f069519..8161fc3 100644
+--- a/web/frontend/src/components/BadgeCard.jsx
++++ b/web/frontend/src/components/BadgeCard.jsx
+@@ -1,32 +1,48 @@
++import { Award, Lock } from "lucide-react";
++import useAIText from "../hooks/useAIText";
++
+ export default function BadgeCard({ badge }) {
+-  const { name, icon, description, earned, earnedDate } = badge;
++  const t = useAIText("profile");
++  const earned = badge?.earned ?? false;
+ 
+   return (
+     <div
+-      className={`glass-card p-5 text-center transition-all duration-300 group ${
++      className={`glass-card p-4 flex flex-col items-center text-center transition-all duration-300 ${
+         earned
+-          ? "hover:border-primary-500/40 animate-pulse-glow"
+-          : "opacity-40 grayscale hover:opacity-60"
++          ? "border-accent-emerald/30 hover:border-accent-emerald/50 hover:shadow-lg hover:shadow-accent-emerald/10"
++          : "opacity-40 grayscale hover:opacity-60 hover:grayscale-0"
+       }`}
+     >
+-      <div
+-        className={`text-4xl mb-3 transition-transform duration-300 ${
+-          earned ? "group-hover:scale-110" : ""
++      {/* Icon */}
++      <div className="relative mb-3">
++        <span className="text-3xl">{badge?.icon || "🏅"}</span>
++        {!earned && (
++          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-surface-bg rounded-full flex items-center justify-center border border-card-bg">
++            <Lock className="w-2.5 h-2.5 text-text-muted" />
++          </div>
++        )}
++      </div>
++
++      {/* Name */}
++      <h4 className="text-sm font-medium text-text-main mb-1">{badge?.name || "Badge"}</h4>
++
++      {/* Status */}
++      <span
++        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
++          earned
++            ? "bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/20"
++            : "bg-surface-bg text-text-muted border border-card-bg"
+         }`}
+       >
+-        {icon}
+-      </div>
+-      <h4 className="text-sm font-semibold text-surface-100 mb-1">{name}</h4>
+-      <p className="text-xs text-surface-200/50 mb-2 leading-relaxed">{description}</p>
+-      {earned ? (
+-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-500/15 text-primary-300 border border-primary-500/20">
+-          Earned {earnedDate}
+-        </span>
+-      ) : (
+-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-surface-700/30 text-surface-200/40 border border-surface-700/30">
+-          Locked
+-        </span>
+-      )}
++        {earned ? (
++          <>
++            <Award className="w-3 h-3" />
++            {t("earned_label", "Earned")}
++          </>
++        ) : (
++          t("locked_label", "Locked")
++        )}
++      </span>
+     </div>
+   );
+ }
+diff --git a/web/frontend/src/components/HistoryChart.jsx b/web/frontend/src/components/HistoryChart.jsx
+index e3341fa..6760584 100644
+--- a/web/frontend/src/components/HistoryChart.jsx
++++ b/web/frontend/src/components/HistoryChart.jsx
+@@ -1,77 +1,92 @@
+-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
++import {
++  LineChart,
++  Line,
++  XAxis,
++  YAxis,
++  CartesianGrid,
++  Tooltip,
++  Legend,
++  ResponsiveContainer,
++  Area,
++  AreaChart,
++} from "recharts";
++import useAIText from "../hooks/useAIText";
+ 
+-const CustomTooltip = ({ active, payload, label }) => {
+-  if (active && payload && payload.length) {
+-    return (
+-      <div className="glass-card p-3 !rounded-xl text-sm">
+-        <p className="text-surface-200/60 text-xs mb-1">{label}</p>
+-        <p className="text-primary-300 font-semibold">Score: {payload[0].value}</p>
+-        {payload[1] && (
+-          <p className="text-accent-400 text-xs">Purchases: {payload[1].value}</p>
+-        )}
+-      </div>
+-    );
+-  }
+-  return null;
+-};
++export default function HistoryChart({ data = [], title }) {
++  const t = useAIText("chart");
++  const chartTitle = title || t("default_title", "Carbon Footprint Trend");
++
++  if (!data.length) return null;
++
++  // Normalize data shape
++  const chartData = data.map((d) => ({
++    label: d.month || d.label || d.date || "",
++    score: d.score ?? d.eco ?? 0,
++    purchases: d.purchases ?? d.count ?? 0,
++  }));
+ 
+-export default function HistoryChart({ data, title = "Carbon Footprint Trend" }) {
+   return (
+     <div className="glass-card p-6">
+-      <h3 className="text-lg font-semibold text-surface-100 mb-6">{title}</h3>
+-      <div className="h-64">
+-        <ResponsiveContainer width="100%" height="100%">
+-          <AreaChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+-            <defs>
+-              <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+-              </linearGradient>
+-            </defs>
+-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+-            <XAxis
+-              dataKey="week"
+-              tick={{ fill: "rgba(241,245,249,0.4)", fontSize: 12 }}
+-              axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
+-              tickLine={false}
+-            />
+-            <YAxis
+-              domain={[0, 100]}
+-              tick={{ fill: "rgba(241,245,249,0.4)", fontSize: 12 }}
+-              axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
+-              tickLine={false}
+-            />
+-            <Tooltip content={<CustomTooltip />} />
+-            <Area
+-              type="monotone"
+-              dataKey="score"
+-              stroke="#10b981"
+-              strokeWidth={2.5}
+-              fill="url(#scoreGradient)"
+-              dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#064e3b" }}
+-              activeDot={{ r: 6, fill: "#34d399", stroke: "#10b981", strokeWidth: 2 }}
+-            />
+-            <Line
+-              type="monotone"
+-              dataKey="purchases"
+-              stroke="#a3e635"
+-              strokeWidth={1.5}
+-              strokeDasharray="5 5"
+-              dot={false}
+-            />
+-          </AreaChart>
+-        </ResponsiveContainer>
+-      </div>
+-      <div className="flex items-center justify-center gap-6 mt-4">
+-        <div className="flex items-center gap-2">
+-          <div className="w-3 h-3 rounded-full bg-primary-500" />
+-          <span className="text-xs text-surface-200/50">Eco Score</span>
+-        </div>
+-        <div className="flex items-center gap-2">
+-          <div className="w-3 h-0.5 bg-accent-400" style={{ borderTop: "2px dashed #a3e635" }} />
+-          <span className="text-xs text-surface-200/50">Purchases</span>
+-        </div>
+-      </div>
++      <h3 className="text-lg font-semibold text-surface-100 mb-4">{chartTitle}</h3>
++      <ResponsiveContainer width="100%" height={280}>
++        <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
++          <defs>
++            <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
++              <stop offset="5%" stopColor="rgba(0, 210, 127, 0.3)" />
++              <stop offset="95%" stopColor="rgba(0, 210, 127, 0)" />
++            </linearGradient>
++            <linearGradient id="purchasesGradient" x1="0" y1="0" x2="0" y2="1">
++              <stop offset="5%" stopColor="rgba(0, 188, 212, 0.2)" />
++              <stop offset="95%" stopColor="rgba(0, 188, 212, 0)" />
++            </linearGradient>
++          </defs>
++          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
++          <XAxis
++            dataKey="label"
++            tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
++            axisLine={{ stroke: "rgba(255,255,255,0.05)" }}
++            tickLine={false}
++          />
++          <YAxis
++            tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
++            axisLine={{ stroke: "rgba(255,255,255,0.05)" }}
++            tickLine={false}
++          />
++          <Tooltip
++            contentStyle={{
++              backgroundColor: "rgba(26,26,46, 0.95)",
++              border: "1px solid rgba(0,210,127,0.2)",
++              borderRadius: 12,
++              color: "rgba(255,255,255,0.8)",
++              fontSize: 12,
++            }}
++            labelStyle={{ color: "rgba(255,255,255,0.5)" }}
++          />
++          <Legend
++            wrapperStyle={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}
++          />
++          <Area
++            type="monotone"
++            dataKey="score"
++            name={t("score_legend", "Eco Score")}
++            stroke="rgba(0, 210, 127, 0.8)"
++            fill="url(#scoreGradient)"
++            strokeWidth={2}
++            dot={{ fill: "rgba(0, 210, 127, 1)", r: 4 }}
++            activeDot={{ r: 6 }}
++          />
++          <Area
++            type="monotone"
++            dataKey="purchases"
++            name={t("purchases_legend", "Purchases")}
++            stroke="rgba(0, 188, 212, 0.6)"
++            fill="url(#purchasesGradient)"
++            strokeWidth={1.5}
++            dot={{ fill: "rgba(0, 188, 212, 0.8)", r: 3 }}
++            activeDot={{ r: 5 }}
++          />
++        </AreaChart>
++      </ResponsiveContainer>
+     </div>
+   );
+ }
+diff --git a/web/frontend/src/components/IngredientBreakdown.jsx b/web/frontend/src/components/IngredientBreakdown.jsx
+index e803b5a..99eb0a2 100644
+--- a/web/frontend/src/components/IngredientBreakdown.jsx
++++ b/web/frontend/src/components/IngredientBreakdown.jsx
+@@ -1,24 +1,26 @@
+-import { getTierColor } from "../data/mockData";
+ import { CheckCircle, AlertTriangle, XCircle } from "lucide-react";
++import useAIText from "../hooks/useAIText";
+ 
+ function getImpactIcon(impact) {
+-  if (impact === "Very Low" || impact === "Low") return <CheckCircle className="w-4 h-4 text-primary-400" />;
++  if (impact === "Very Low" || impact === "Low") return <CheckCircle className="w-4 h-4 text-accent-emerald" />;
+   if (impact === "Moderate") return <AlertTriangle className="w-4 h-4 text-warn-400" />;
+   return <XCircle className="w-4 h-4 text-danger-400" />;
+ }
+ 
+ function getScoreBarColor(score) {
+-  if (score >= 75) return "bg-primary-500";
++  if (score >= 75) return "bg-accent-emerald";
+   if (score >= 50) return "bg-warn-500";
+   return "bg-danger-500";
+ }
+ 
+ export default function IngredientBreakdown({ ingredients }) {
++  const t = useAIText("ingredients");
++
+   if (!ingredients || ingredients.length === 0) return null;
+ 
+   return (
+     <div className="glass-card p-6">
+-      <h3 className="text-lg font-semibold text-surface-100 mb-4">Ingredient Analysis</h3>
++      <h3 className="text-lg font-semibold text-text-main mb-4">{t("title", "Ingredient Analysis")}</h3>
+       <div className="space-y-3">
+         {ingredients.map((ing, idx) => (
+           <div
+@@ -27,27 +29,27 @@ export default function IngredientBreakdown({ ingredients }) {
+             style={{ animationDelay: `${idx * 0.08}s`, opacity: 0 }}
+           >
+             {/* Impact Icon */}
+-            <div className="flex-shrink-0">{getImpactIcon(ing.impact)}</div>
++            <div className="shrink-0">{getImpactIcon(ing.impact)}</div>
+ 
+             {/* Name + Details */}
+             <div className="flex-1 min-w-0">
+               <div className="flex items-center justify-between mb-1">
+-                <span className="text-sm font-medium text-surface-100 truncate">{ing.name}</span>
+-                <span className="text-xs text-surface-200/50 ml-2 flex-shrink-0">{ing.score}/100</span>
++                <span className="text-sm font-medium text-text-main truncate">{ing.name}</span>
++                <span className="text-xs text-text-muted ml-2 shrink-0">{ing.score}/100</span>
+               </div>
+               {/* Score Bar */}
+-              <div className="h-1.5 bg-surface-700/50 rounded-full overflow-hidden">
++              <div className="h-1.5 bg-surface-bg rounded-full overflow-hidden">
+                 <div
+                   className={`h-full rounded-full transition-all duration-1000 ease-out ${getScoreBarColor(ing.score)}`}
+                   style={{ width: `${ing.score}%` }}
+                 />
+               </div>
+               <div className="flex items-center gap-3 mt-1.5">
+-                <span className="text-xs text-surface-200/40">
+-                  Sustainability: <span className="text-surface-200/60">{ing.sustainability}</span>
++                <span className="text-xs text-text-muted">
++                  {t("sustainability_label", "Sustainability:")} <span className="text-text-main">{ing.sustainability}</span>
+                 </span>
+-                <span className="text-xs text-surface-200/40">
+-                  Impact: <span className="text-surface-200/60">{ing.impact}</span>
++                <span className="text-xs text-text-muted">
++                  {t("impact_label", "Impact:")} <span className="text-text-main">{ing.impact}</span>
+                 </span>
+               </div>
+             </div>
+diff --git a/web/frontend/src/components/Navbar.jsx b/web/frontend/src/components/Navbar.jsx
+index 6a7a0ca..21a5a23 100644
+--- a/web/frontend/src/components/Navbar.jsx
++++ b/web/frontend/src/components/Navbar.jsx
+@@ -1,61 +1,66 @@
+ import { NavLink } from "react-router-dom";
+-import { Leaf, Search, History, Award, Wifi, WifiOff, Cpu } from "lucide-react";
++import { Leaf, Search, History, Award, Wifi, WifiOff, Cpu, Moon, Sun } from "lucide-react";
+ import { useApi } from "../context/ApiContext";
+-
+-const navItems = [
+-  { to: "/", label: "Home", icon: Search },
+-  { to: "/calculator", label: "Calculator", icon: Cpu },
+-  { to: "/history", label: "History", icon: History },
+-  { to: "/profile", label: "Badges", icon: Award },
+-];
++import useAIText from "../hooks/useAIText";
++import { useTheme } from "../context/ThemeContext";
+ 
+ function StatusDot({ backend }) {
++  const t = useAIText("navbar");
+   const isOnline = backend.status === "ok";
+   const isMock = backend.status === "mock" || backend.mock_mode;
+   const isChecking = backend.status === "checking";
+ 
+   let dotColor, label, Icon;
+   if (isChecking) {
+-    dotColor = "bg-warn-400 animate-pulse";
+-    label = "Connecting…";
++    dotColor = "bg-score-c animate-pulse";
++    label = t("status_connecting", "Connecting…");
+     Icon = Wifi;
+   } else if (isOnline && !isMock) {
+-    dotColor = "bg-primary-400";
+-    label = `Gemma 3 · Live`;
++    dotColor = "bg-score-a";
++    label = t("status_live", "Gemma 3 · Live");
+     Icon = Cpu;
+   } else if (isOnline && isMock) {
+-    dotColor = "bg-warn-400";
+-    label = "Backend Mock";
++    dotColor = "bg-score-c";
++    label = t("status_mock", "Backend Mock");
+     Icon = Cpu;
+   } else {
+-    dotColor = "bg-danger-400";
+-    label = "Offline · Mock";
++    dotColor = "bg-score-f";
++    label = t("status_offline", "Offline · Mock");
+     Icon = WifiOff;
+   }
+ 
+   return (
+-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-800/60 border border-surface-700/30 text-xs">
+-      <span className={`w-2 h-2 rounded-full ${dotColor} flex-shrink-0`} />
+-      <Icon className="w-3 h-3 text-surface-200/50 flex-shrink-0" />
+-      <span className="text-surface-200/60 hidden sm:inline whitespace-nowrap">{label}</span>
++    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-bg/60 border border-text-muted/20 text-xs">
++      <span className={`w-2 h-2 rounded-full ${dotColor} shrink-0`} />
++      <Icon className="w-3 h-3 text-text-muted/70 shrink-0" />
++      <span className="text-text-muted hidden sm:inline whitespace-nowrap">{label}</span>
+     </div>
+   );
+ }
+ 
+ export default function Navbar() {
+   const { backend } = useApi();
++  const t = useAIText("navbar");
++  const { isDarkMode, toggleTheme } = useTheme();
++
++  const navItems = [
++    { to: "/", label: t("home", "Home"), icon: Search },
++    { to: "/calculator", label: t("calculator", "Calculator"), icon: Cpu },
++    { to: "/history", label: t("history", "History"), icon: History },
++    { to: "/profile", label: t("badges", "Badges"), icon: Award },
++  ];
+ 
+   return (
+-    <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-primary-700/30 rounded-none">
++    <nav className="fixed top-0 left-0 right-0 z-50 glass-card rounded-none">
+       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+         <div className="flex items-center justify-between h-16">
+           {/* Logo */}
+           <NavLink to="/" className="flex items-center gap-2 group">
+-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/25 group-hover:shadow-primary-500/40 transition-shadow">
+-              <Leaf className="w-5 h-5 text-white" />
++            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-accent-emerald to-accent-emerald-dark flex items-center justify-center shadow-lg shadow-accent-emerald/25 group-hover:shadow-accent-emerald/40 transition-shadow">
++              <Leaf className="w-5 h-5 text-surface-bg" />
+             </div>
+-            <span className="text-xl font-bold bg-gradient-to-r from-primary-300 to-accent-400 bg-clip-text text-transparent">
+-              GreenNova
++            <span className="text-xl font-bold bg-linear-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent">
++              {t("brand", "GreenNova")}
+             </span>
+           </NavLink>
+ 
+@@ -68,8 +73,8 @@ export default function Navbar() {
+                 className={({ isActive }) =>
+                   `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+                     isActive
+-                      ? "bg-primary-500/20 text-primary-300 shadow-lg shadow-primary-500/10"
+-                      : "text-surface-200/70 hover:text-primary-300 hover:bg-white/5"
++                      ? "bg-accent-emerald/10 text-accent-emerald shadow-lg shadow-accent-emerald/5"
++                      : "text-text-muted hover:text-accent-emerald-dark hover:bg-text-muted/5"
+                   }`
+                 }
+               >
+@@ -79,7 +84,16 @@ export default function Navbar() {
+             ))}
+ 
+             {/* Separator */}
+-            <div className="w-px h-6 bg-surface-700/40 mx-1 hidden sm:block" />
++            <div className="w-px h-6 bg-text-muted/20 mx-1 hidden sm:block" />
++
++            {/* Theme Toggle */}
++            <button
++              onClick={toggleTheme}
++              className="p-2 rounded-xl text-text-muted hover:text-accent-emerald hover:bg-text-muted/5 transition-colors"
++              aria-label="Toggle Dark Mode"
++            >
++              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
++            </button>
+ 
+             {/* Backend status */}
+             <StatusDot backend={backend} />
+diff --git a/web/frontend/src/components/NotificationBanner.jsx b/web/frontend/src/components/NotificationBanner.jsx
+index ab71c0c..8e07932 100644
+--- a/web/frontend/src/components/NotificationBanner.jsx
++++ b/web/frontend/src/components/NotificationBanner.jsx
+@@ -9,13 +9,13 @@ export default function NotificationBanner({ type = "warning", message, dismissi
+   const styles = {
+     warning: {
+       bg: "bg-warn-500/10 border-warn-500/30",
+-      icon: <AlertTriangle className="w-5 h-5 text-warn-400 flex-shrink-0" />,
++      icon: <AlertTriangle className="w-5 h-5 text-warn-400 shrink-0" />,
+       text: "text-warn-400",
+     },
+     success: {
+-      bg: "bg-primary-500/10 border-primary-500/30",
+-      icon: <CheckCircle className="w-5 h-5 text-primary-400 flex-shrink-0" />,
+-      text: "text-primary-300",
++      bg: "bg-accent-emerald/10 border-accent-emerald/30",
++      icon: <CheckCircle className="w-5 h-5 text-accent-emerald shrink-0" />,
++      text: "text-accent-emerald",
+     },
+   };
+ 
+@@ -26,7 +26,7 @@ export default function NotificationBanner({ type = "warning", message, dismissi
+       {s.icon}
+       <p className={`text-sm flex-1 ${s.text}`}>{message}</p>
+       {dismissible && (
+-        <button onClick={() => setVisible(false)} className="text-surface-200/40 hover:text-surface-200/70 transition-colors">
++        <button onClick={() => setVisible(false)} className="text-text-muted hover:text-text-main transition-colors">
+           <X className="w-4 h-4" />
+         </button>
+       )}
+diff --git a/web/frontend/src/components/SearchInput.jsx b/web/frontend/src/components/SearchInput.jsx
+index e9fc499..1f1b5cd 100644
+--- a/web/frontend/src/components/SearchInput.jsx
++++ b/web/frontend/src/components/SearchInput.jsx
+@@ -1,10 +1,12 @@
+ import { useState } from "react";
+ import { Search, Upload, X } from "lucide-react";
++import useAIText from "../hooks/useAIText";
+ 
+ export default function SearchInput({ onSearch, onImageUpload }) {
+   const [query, setQuery] = useState("");
+   const [dragActive, setDragActive] = useState(false);
+   const [uploadedImage, setUploadedImage] = useState(null);
++  const t = useAIText("search");
+ 
+   const handleSubmit = (e) => {
+     e.preventDefault();
+@@ -48,19 +50,19 @@ export default function SearchInput({ onSearch, onImageUpload }) {
+       {/* Search Bar */}
+       <form onSubmit={handleSubmit} className="relative">
+         <div className="relative group">
+-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-200/40 group-focus-within:text-primary-400 transition-colors" />
++          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted/50 group-focus-within:text-accent-emerald transition-colors" />
+           <input
+             type="text"
+             value={query}
+             onChange={(e) => setQuery(e.target.value)}
+-            placeholder="Search product name, ingredients, or barcode..."
+-            className="w-full pl-12 pr-4 py-4 bg-surface-800/60 border border-surface-700/50 rounded-2xl text-surface-100 placeholder:text-surface-200/30 focus:outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 transition-all duration-300 text-base"
++            placeholder={t("placeholder", "Search product name, ingredients, or barcode...")}
++            className="w-full pl-12 pr-4 py-4 bg-card-bg/60 border border-text-muted/20 rounded-2xl text-text-main placeholder:text-text-muted/50 focus:outline-none focus:border-accent-emerald/50 focus:ring-2 focus:ring-accent-emerald/20 transition-all duration-300 text-base"
+           />
+           <button
+             type="submit"
+-            className="absolute right-3 top-1/2 -translate-y-1/2 px-5 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl text-sm font-medium hover:from-primary-400 hover:to-primary-500 transition-all duration-300 shadow-lg shadow-primary-500/20 hover:shadow-primary-500/40"
++            className="absolute right-3 top-1/2 -translate-y-1/2 px-5 py-2 bg-linear-to-r from-accent-emerald to-accent-emerald-dark text-white rounded-xl text-sm font-medium hover:from-accent-emerald-dark hover:to-accent-emerald transition-all duration-300 shadow-lg shadow-accent-emerald/20 hover:shadow-accent-emerald/40"
+           >
+-            Analyze
++            {t("button", "Analyze")}
+           </button>
+         </div>
+       </form>
+@@ -73,8 +75,8 @@ export default function SearchInput({ onSearch, onImageUpload }) {
+         onDrop={handleDrop}
+         className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer ${
+           dragActive
+-            ? "border-primary-400 bg-primary-500/10"
+-            : "border-surface-700/40 hover:border-primary-500/30 bg-surface-800/30"
++            ? "border-accent-emerald bg-accent-emerald/10"
++            : "border-text-muted/30 hover:border-accent-emerald/30 bg-card-bg/30"
+         }`}
+       >
+         {uploadedImage ? (
+@@ -82,19 +84,19 @@ export default function SearchInput({ onSearch, onImageUpload }) {
+             <img src={uploadedImage} alt="Uploaded" className="max-h-32 rounded-xl" />
+             <button
+               onClick={clearImage}
+-              className="absolute -top-2 -right-2 w-6 h-6 bg-danger-500 rounded-full flex items-center justify-center text-white hover:bg-danger-400 transition-colors"
++              className="absolute -top-2 -right-2 w-6 h-6 bg-score-f rounded-full flex items-center justify-center text-white hover:opacity-80 transition-colors"
+             >
+               <X className="w-3 h-3" />
+             </button>
+           </div>
+         ) : (
+           <label className="cursor-pointer">
+-            <Upload className="w-8 h-8 text-surface-200/30 mx-auto mb-2" />
+-            <p className="text-sm text-surface-200/50">
+-              Drag & drop a product label image, or{" "}
+-              <span className="text-primary-400 hover:text-primary-300 underline">browse</span>
++            <Upload className="w-8 h-8 text-text-muted/30 mx-auto mb-2" />
++            <p className="text-sm text-text-muted">
++              {t("upload_text", "Drag & drop a product label image, or")}{" "}
++              <span className="text-accent-emerald hover:text-accent-emerald-dark underline">{t("browse", "browse")}</span>
+             </p>
+-            <p className="text-xs text-surface-200/30 mt-1">JPEG, PNG up to 10MB</p>
++            <p className="text-xs text-text-muted/50 mt-1">{t("upload_hint", "JPEG, PNG up to 10MB")}</p>
+             <input
+               type="file"
+               accept="image/jpeg,image/png"
+diff --git a/web/frontend/src/components/SustainabilityScoreCard.jsx b/web/frontend/src/components/SustainabilityScoreCard.jsx
+index 3543e0f..747ac66 100644
+--- a/web/frontend/src/components/SustainabilityScoreCard.jsx
++++ b/web/frontend/src/components/SustainabilityScoreCard.jsx
+@@ -1,74 +1,64 @@
+-import { getTierColor } from "../data/mockData";
++import { getTierColor, getTierLabel } from "../data/mockData";
++import { Leaf, TrendingUp, TrendingDown, Minus } from "lucide-react";
+ 
+-export default function SustainabilityScoreCard({ score, tier, badge, productName, compact = false }) {
+-  const tierColor = getTierColor(tier);
+-  const radius = compact ? 36 : 54;
+-  const stroke = compact ? 5 : 7;
+-  const circumference = 2 * Math.PI * radius;
+-  const offset = circumference - (score / 100) * circumference;
++export default function SustainabilityScoreCard({ score, tier, badge, carbonFootprint, description }) {
++  const tierColors = getTierColor(tier);
++  const tierColor = tierColors.text;
++  const tierLabel = getTierLabel(tier);
++
++  const ScoreIcon = score >= 75 ? TrendingUp : score >= 50 ? Minus : TrendingDown;
+ 
+   return (
+-    <div
+-      className={`glass-card p-6 flex items-center gap-6 transition-all duration-300 hover:border-primary-500/30 ${
+-        compact ? "p-4 gap-4" : ""
+-      }`}
+-      style={{ borderColor: tierColor.border }}
+-    >
+-      {/* Circular Score */}
+-      <div className="score-circle flex-shrink-0">
+-        <svg width={(radius + stroke) * 2} height={(radius + stroke) * 2}>
+-          {/* Background circle */}
+-          <circle
+-            cx={radius + stroke}
+-            cy={radius + stroke}
+-            r={radius}
+-            fill="none"
+-            stroke="rgba(255,255,255,0.06)"
+-            strokeWidth={stroke}
+-          />
+-          {/* Score arc */}
+-          <circle
+-            cx={radius + stroke}
+-            cy={radius + stroke}
+-            r={radius}
+-            fill="none"
+-            stroke={tierColor.text}
+-            strokeWidth={stroke}
+-            strokeLinecap="round"
+-            strokeDasharray={circumference}
+-            strokeDashoffset={offset}
+-            style={{ transition: "stroke-dashoffset 1s ease-out" }}
+-          />
+-        </svg>
+-        <div className="absolute inset-0 flex flex-col items-center justify-center">
+-          <span className={`font-bold ${compact ? "text-xl" : "text-3xl"}`} style={{ color: tierColor.text }}>
+-            {score}
+-          </span>
+-          <span className="text-[10px] text-surface-200/50 uppercase tracking-wider">score</span>
++    <div className="glass-card p-6">
++      {/* Score Circle */}
++      <div className="flex items-center gap-6 mb-4">
++        <div className="relative w-24 h-24 shrink-0">
++          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
++            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
++            <circle
++              cx="50"
++              cy="50"
++              r="42"
++              fill="none"
++              stroke={tierColor}
++              strokeWidth="8"
++              strokeLinecap="round"
++              strokeDasharray={`${score * 2.64} 264`}
++              className="transition-all duration-1000 ease-out"
++            />
++          </svg>
++          <div className="absolute inset-0 flex items-center justify-center">
++            <div className="text-center">
++              <span className="text-2xl font-bold text-text-main">{score}</span>
++              <span className="text-xs text-text-muted block">/100</span>
++            </div>
++          </div>
+         </div>
+-      </div>
+ 
+-      {/* Info */}
+-      <div className="flex-1 min-w-0">
+-        {productName && (
+-          <h3 className={`font-semibold text-surface-100 truncate ${compact ? "text-sm" : "text-lg"}`}>
+-            {productName}
+-          </h3>
+-        )}
+-        <div className="flex items-center gap-2 mt-1">
+-          <span
+-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+-            style={{ backgroundColor: tierColor.bg, borderColor: tierColor.border, color: tierColor.text }}
+-          >
+-            {tier}
+-          </span>
++        <div className="flex-1 min-w-0">
+           {badge && (
+-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-500/10 text-primary-300 border border-primary-500/20">
++            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/20 mb-2">
++              <Leaf className="w-3 h-3" />
+               {badge}
+             </span>
+           )}
++          <div className="flex items-center gap-2 mb-1">
++            <span className="text-sm font-medium" style={{ color: tierColor }}>
++              {tierLabel}
++            </span>
++            <ScoreIcon className="w-4 h-4" style={{ color: tierColor }} />
++          </div>
++          <p className="text-sm text-text-muted line-clamp-2">{description}</p>
+         </div>
+       </div>
++
++      {/* Carbon Footprint */}
++      {carbonFootprint && (
++        <div className="glass-card-light p-3 flex items-center justify-between">
++          <span className="text-xs text-text-muted">Carbon Footprint</span>
++          <span className="text-sm font-medium text-text-main">{carbonFootprint}</span>
++        </div>
++      )}
+     </div>
+   );
+ }
+diff --git a/web/frontend/src/data/mockData.js b/web/frontend/src/data/mockData.js
+index f43f2a1..b5b403a 100644
+--- a/web/frontend/src/data/mockData.js
++++ b/web/frontend/src/data/mockData.js
+@@ -135,9 +135,9 @@ export const mockWeeklyTrend = [
+ ];
+ 
+ export const mockCategoryBreakdown = [
+-  { category: "Household", avgScore: 73, count: 3, color: "#10b981" },
+-  { category: "Personal Care", avgScore: 85, count: 4, color: "#06b6d4" },
+-  { category: "Food & Beverage", avgScore: 60, count: 5, color: "#f59e0b" },
++  { category: "Household", avgScore: 73, count: 3, color: "#00D27F" },
++  { category: "Personal Care", avgScore: 85, count: 4, color: "#00BCD4" },
++  { category: "Food & Beverage", avgScore: 60, count: 5, color: "#F0B232" },
+ ];
+ 
+ export const mockBadges = [
+@@ -158,10 +158,10 @@ export const mockRecentSearches = [
+ 
+ export function getTierColor(tier) {
+   switch (tier) {
+-    case "GREEN": return { text: "#10b981", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" };
+-    case "AMBER": return { text: "#f59e0b", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)" };
+-    case "RED": return { text: "#ef4444", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)" };
+-    default: return { text: "#94a3b8", bg: "rgba(148, 163, 184, 0.15)", border: "rgba(148, 163, 184, 0.3)" };
++    case "GREEN": return { text: "#00D27F", bg: "rgba(0, 210, 127, 0.15)", border: "rgba(0, 210, 127, 0.3)" };
++    case "AMBER": return { text: "#F0B232", bg: "rgba(240, 178, 50, 0.15)", border: "rgba(240, 178, 50, 0.3)" };
++    case "RED": return { text: "#F24E4E", bg: "rgba(242, 78, 78, 0.15)", border: "rgba(242, 78, 78, 0.3)" };
++    default: return { text: "#9898B0", bg: "rgba(152, 152, 176, 0.15)", border: "rgba(152, 152, 176, 0.3)" };
+   }
+ }
+ 
+diff --git a/web/frontend/src/index.css b/web/frontend/src/index.css
+index 9cf8623..c4089c8 100644
+--- a/web/frontend/src/index.css
++++ b/web/frontend/src/index.css
+@@ -2,35 +2,41 @@
+ 
+ /* ===== GreenNova Design System ===== */
+ @theme {
+-  --color-primary-50: #ecfdf5;
+-  --color-primary-100: #d1fae5;
+-  --color-primary-200: #a7f3d0;
+-  --color-primary-300: #6ee7b7;
+-  --color-primary-400: #34d399;
+-  --color-primary-500: #10b981;
+-  --color-primary-600: #059669;
+-  --color-primary-700: #047857;
+-  --color-primary-800: #065f46;
+-  --color-primary-900: #064e3b;
+-
+-  --color-accent-400: #a3e635;
+-  --color-accent-500: #84cc16;
+-
+-  --color-warn-400: #fbbf24;
+-  --color-warn-500: #f59e0b;
+-
+-  --color-danger-400: #f87171;
+-  --color-danger-500: #ef4444;
++  --color-primary-charcoal: #1A1A2E;
++  --color-primary-slate: #2D2D44;
++  --color-primary-deep: #0D0D1A;
++
++  --color-accent-emerald: #00D27F;
++  --color-accent-emerald-dark: #00A865;
++  --color-accent-cyan: #00BCD4;
++
++  --color-score-a: #00D27F;
++  --color-score-b: #7ED957;
++  --color-score-c: #FFBF00;
++  --color-score-d: #FF6B35;
++  --color-score-f: #FF3355;
++
++  --color-page-bg: var(--theme-page-bg);
++  --color-surface-bg: var(--theme-surface);
++  --color-card-bg: var(--theme-card);
++  --color-text-main: var(--theme-text-primary);
++  --color-text-muted: var(--theme-text-secondary);
++}
+ 
+-  --color-surface-50: #f8fafc;
+-  --color-surface-100: #f1f5f9;
+-  --color-surface-200: #e2e8f0;
+-  --color-surface-700: #334155;
+-  --color-surface-800: #1e293b;
+-  --color-surface-900: #0f172a;
+-  --color-surface-950: #020617;
++:root {
++  --theme-page-bg: #F2F2F7;
++  --theme-surface: #FFFFFF;
++  --theme-card: #FFFFFF;
++  --theme-text-primary: #1A1A2E;
++  --theme-text-secondary: #6B6B80;
++}
+ 
+-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
++.dark {
++  --theme-page-bg: #0D0D1A;
++  --theme-surface: #1A1A2E;
++  --theme-card: #252538;
++  --theme-text-primary: #F0F0F5;
++  --theme-text-secondary: #9999AA;
+ }
+ 
+ /* ===== Base Styles ===== */
+@@ -40,23 +46,25 @@ html {
+ 
+ body {
+   font-family: var(--font-sans);
+-  background: linear-gradient(135deg, var(--color-surface-950) 0%, var(--color-surface-900) 50%, var(--color-primary-900) 100%);
+-  color: var(--color-surface-100);
++  background-color: var(--color-page-bg);
++  color: var(--color-text-main);
+   min-height: 100vh;
++  transition: background-color 0.3s ease, color 0.3s ease;
+ }
+ 
+ /* ===== Card Glass Effect ===== */
+ .glass-card {
+-  background: rgba(15, 23, 42, 0.6);
++  background-color: color-mix(in srgb, var(--color-card-bg) 85%, transparent);
+   backdrop-filter: blur(16px);
+-  border: 1px solid rgba(16, 185, 129, 0.15);
++  border: 1px solid color-mix(in srgb, var(--color-text-main) 10%, transparent);
+   border-radius: 16px;
++  box-shadow: 0 4px 6px -1px color-mix(in srgb, var(--color-primary-deep) 15%, transparent);
+ }
+ 
+ .glass-card-light {
+-  background: rgba(241, 245, 249, 0.05);
++  background-color: color-mix(in srgb, var(--color-surface-bg) 70%, transparent);
+   backdrop-filter: blur(12px);
+-  border: 1px solid rgba(255, 255, 255, 0.08);
++  border: 1px solid color-mix(in srgb, var(--color-text-main) 8%, transparent);
+   border-radius: 12px;
+ }
+ 
+@@ -120,18 +128,18 @@ body {
+   width: 6px;
+ }
+ ::-webkit-scrollbar-track {
+-  background: var(--color-surface-900);
++  background: var(--color-page-bg);
+ }
+ ::-webkit-scrollbar-thumb {
+-  background: var(--color-primary-700);
++  background: var(--color-primary-slate);
+   border-radius: 3px;
+ }
+ 
+ /* ===== Tier Colors ===== */
+-.tier-green { color: #10b981; }
+-.tier-amber { color: #f59e0b; }
+-.tier-red { color: #ef4444; }
++.tier-green { color: var(--color-score-a); }
++.tier-amber { color: var(--color-score-c); }
++.tier-red { color: var(--color-score-f); }
+ 
+-.tier-green-bg { background-color: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); }
+-.tier-amber-bg { background-color: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); }
+-.tier-red-bg { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); }
++.tier-green-bg { background-color: color-mix(in srgb, var(--color-score-a) 15%, transparent); border-color: color-mix(in srgb, var(--color-score-a) 30%, transparent); }
++.tier-amber-bg { background-color: color-mix(in srgb, var(--color-score-c) 15%, transparent); border-color: color-mix(in srgb, var(--color-score-c) 30%, transparent); }
++.tier-red-bg { background-color: color-mix(in srgb, var(--color-score-f) 15%, transparent); border-color: color-mix(in srgb, var(--color-score-f) 30%, transparent); }
+diff --git a/web/frontend/src/pages/Calculator.jsx b/web/frontend/src/pages/Calculator.jsx
+index cd9c054..5d24cce 100644
+--- a/web/frontend/src/pages/Calculator.jsx
++++ b/web/frontend/src/pages/Calculator.jsx
+@@ -1,205 +1,283 @@
+ import { useState } from "react";
+-import { MoveRight, Loader2, Sparkles, UserX, RefreshCw } from "lucide-react";
+-import { calculatorQuestions, BASE_IMPACT } from "../data/calculatorData";
++import {
++  ChevronRight,
++  ChevronLeft,
++  Calculator as CalcIcon,
++  Leaf,
++  Car,
++  Home,
++  Utensils,
++  ShoppingBag,
++  Recycle,
++  Plane,
++  SkipForward,
++  RotateCcw,
++  Loader2,
++} from "lucide-react";
++import { calculatorQuestions as questions, BASE_IMPACT } from "../data/calculatorData";
++import useAIText from "../hooks/useAIText";
++import useCalculatorInsights from "../hooks/useCalculatorInsights";
++import NotificationBanner from "../components/NotificationBanner";
++
++const ICONS = [Leaf, Car, Home, Utensils, ShoppingBag, Recycle, Plane];
+ 
+ export default function Calculator() {
+-  const [currentStep, setCurrentStep] = currentStepInit();
++  const [step, setStep] = useState(0);
+   const [answers, setAnswers] = useState({});
+-  const [isCalculated, setIsCalculated] = useState(false);
+-  const [isCalculating, setIsCalculating] = useState(false);
+-  const [skipMode, setSkipMode] = useState(false);
++  const [showResult, setShowResult] = useState(false);
++  const [skipped, setSkipped] = useState(false);
+ 
+-  function currentStepInit() {
+-    return useState(0);
+-  }
++  const t = useAIText("calculator");
++  const { insights, isLoading: insightsLoading, fetchInsights, reset: resetInsights } = useCalculatorInsights();
+ 
+-  const handleSelectOption = (value) => {
+-    setAnswers({ ...answers, [currentStep]: value });
+-    nextStep();
+-  };
++  const currentQ = questions[step];
++  const Icon = ICONS[step] || Leaf;
++  const progress = ((step + 1) / questions.length) * 100;
+ 
+-  const nextStep = () => {
+-    if (currentStep < calculatorQuestions.length - 1) {
+-      setCurrentStep(currentStep + 1);
+-    } else {
+-      calculateResult();
+-    }
++  const calculateCO2 = () => {
++    let total = BASE_IMPACT;
++    questions.forEach((q, i) => {
++      const val = answers[i] ?? q.options[0].value;
++      total += val;
++    });
++    return Math.round(total * 100) / 100;
+   };
+ 
+-  const skipQuestion = () => {
+-    // Skipping assumes average or missing value (0 for math ease, though 
+-    // real models might assume average). We'll assume median impacts later.
+-    setAnswers({ ...answers, [currentStep]: null });
+-    nextStep();
+-  };
++  const handleSelect = async (value) => {
++    const updated = { ...answers, [step]: value };
++    setAnswers(updated);
+ 
+-  const skipCalculator = () => {
+-    setSkipMode(true);
+-    calculateResult();
++    if (step < questions.length - 1) {
++      setStep(step + 1);
++    } else {
++      setShowResult(true);
++      let total = BASE_IMPACT;
++      questions.forEach((q, i) => {
++        const val = updated[i] ?? q.options[0].value;
++        total += val;
++      });
++      total = Math.round(total * 100) / 100;
++      await fetchInsights(updated, total);
++    }
+   };
+ 
+-  const calculateResult = () => {
+-    setIsCalculating(true);
+-    setTimeout(() => {
+-      setIsCalculated(true);
+-      setIsCalculating(false);
+-    }, 1200); // simulate calculation time
++  const handleSkip = () => {
++    setSkipped(true);
++    setShowResult(true);
+   };
+ 
+-  const restart = () => {
+-    setCurrentStep(0);
++  const handleRecalculate = () => {
++    setStep(0);
+     setAnswers({});
+-    setIsCalculated(false);
+-    setSkipMode(false);
++    setShowResult(false);
++    setSkipped(false);
++    resetInsights();
+   };
+ 
+-  const calculateFinalScore = () => {
+-    let total = BASE_IMPACT;
+-    Object.values(answers).forEach((val) => {
+-      // If skipped, we might assign a default median (e.g., 1.5).
+-      total += val !== null ? val : 1.5; 
+-    });
+-    return total.toFixed(1);
+-  };
+-
+-  // Result View
+-  if (isCalculated) {
+-    const finalScore = calculateFinalScore();
+-    let badge = "";
+-    let color = "";
++  const totalCO2 = calculateCO2();
+ 
+-    if (skipMode) {
+-      badge = "Unknown Impact";
+-      color = "text-surface-300";
+-    } else if (finalScore < 6) {
++  // Determine badge and color (fallback or from AI)
++  let badge, badgeColor;
++  if (insights) {
++    badge = insights.badge;
++    badgeColor = insights.badge_color;
++  } else {
++    if (totalCO2 < 6) {
+       badge = "Eco Champion 🌿";
+-      color = "text-accent-400";
+-    } else if (finalScore < 10) {
++      badgeColor = "green";
++    } else if (totalCO2 < 10) {
+       badge = "Conscious Citizen 🌎";
+-      color = "text-primary-400";
++      badgeColor = "yellow";
+     } else {
+       badge = "Needs Improvement 🏭";
+-      color = "text-danger-400";
++      badgeColor = "red";
+     }
++  }
+ 
++  const badgeStyles = {
++    green: "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/20",
++    yellow: "bg-warn-500/15 text-warn-400 border-warn-500/20",
++    red: "bg-danger-500/15 text-danger-400 border-danger-500/20",
++  };
++
++  // Result view
++  if (showResult) {
+     return (
+-      <div className="min-h-screen pt-24 px-4 sm:px-6 lg:px-8 pb-12 flex flex-col items-center">
+-        <div className="max-w-md w-full glass-card p-8 text-center animate-fade-in-up">
+-          <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary-500/10 mb-6">
+-            <Sparkles className="w-8 h-8 text-primary-400" />
+-          </div>
+-          
+-          <h2 className="text-2xl font-bold text-surface-100 mb-2">Your Carbon Footprint</h2>
+-          
+-          {skipMode ? (
+-            <div className="py-8">
+-               <UserX className="w-12 h-12 text-surface-200/50 mx-auto mb-4" />
+-               <p className="text-surface-200/70">You skipped the calculator. We couldn't calculate your accurate footprint.</p>
++      <main className="max-w-2xl mx-auto px-4 pt-24 pb-16 animate-fade-in-up">
++        <div className="glass-card p-8 text-center space-y-6">
++          <CalcIcon className="w-12 h-12 text-accent-emerald mx-auto" />
++          <h1 className="text-3xl font-bold text-text-main">
++            {t("result_title", "Your Carbon Footprint")}
++          </h1>
++
++          {skipped ? (
++            <div className="space-y-4">
++              <p className="text-text-muted">
++                {t("skip_message", "You skipped the calculator. We couldn't calculate your accurate footprint.")}
++              </p>
++              <button
++                onClick={handleRecalculate}
++                className="flex items-center gap-2 mx-auto px-6 py-3 bg-accent-emerald text-page-bg rounded-xl text-sm font-medium hover:bg-accent-emerald-dark transition-all"
++              >
++                <RotateCcw className="w-4 h-4" />
++                {t("recalculate", "Recalculate")}
++              </button>
+             </div>
+           ) : (
+-            <>
+-              <div className="py-6">
+-                <p className="text-5xl font-black bg-linear-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+-                  {finalScore}
+-                </p>
+-                <p className="text-sm text-surface-200/60 mt-2">Tons of CO2 per year</p>
++            <div className="space-y-6">
++              {/* CO2 Display */}
++              <div className="relative">
++                <div className="text-6xl font-bold text-text-main">{totalCO2}</div>
++                <div className="text-sm text-text-muted mt-1">{t("co2_unit", "Tons of CO2 per year")}</div>
+               </div>
+-              <div className="py-3 px-4 rounded-xl bg-surface-800/50 border border-surface-700/50 mb-8 inline-block">
+-                <span className={`font-semibold ${color}`}>{badge}</span>
+-              </div>
+-            </>
+-          )}
+ 
+-          <button
+-            onClick={restart}
+-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-700 hover:bg-surface-600 border border-surface-600/50 text-surface-100 transition-all font-medium"
+-          >
+-            <RefreshCw className="w-4 h-4" />
+-            Recalculate
+-          </button>
+-        </div>
+-      </div>
+-    );
+-  }
++              {/* Badge */}
++              <span
++                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${badgeStyles[badgeColor] || badgeStyles.yellow}`}
++              >
++                {badge}
++              </span>
+ 
+-  // Loading View
+-  if (isCalculating) {
+-    return (
+-      <div className="min-h-screen pt-32 px-4 flex justify-center">
+-        <div className="text-center animate-pulse">
+-          <Loader2 className="w-10 h-10 text-primary-400 animate-spin mx-auto mb-4" />
+-          <h2 className="text-xl font-medium text-surface-100">Calculating your impact...</h2>
+-          <p className="text-surface-200/50 mt-2"> crunching the numbers </p>
++              {/* AI Insights */}
++              {insightsLoading && (
++                <div className="flex items-center justify-center gap-2 text-text-muted text-sm">
++                  <Loader2 className="w-4 h-4 animate-spin" />
++                  {t("calculating", "Calculating your impact...")}
++                </div>
++              )}
++
++              {insights && (
++                <div className="space-y-4 text-left">
++                  {/* Comparison */}
++                  {insights.comparison && (
++                    <NotificationBanner
++                      type={totalCO2 < 4.5 ? "success" : "warning"}
++                      message={insights.comparison}
++                    />
++                  )}
++
++                  {/* Insights */}
++                  {insights.insights?.length > 0 && (
++                    <div className="glass-card-light p-4 space-y-2">
++                      <h3 className="text-sm font-semibold text-text-main flex items-center gap-2">
++                        <Leaf className="w-4 h-4 text-accent-emerald" />
++                        Insights
++                      </h3>
++                      <ul className="space-y-1.5">
++                        {insights.insights.map((insight, i) => (
++                          <li key={i} className="text-sm text-text-muted flex items-start gap-2">
++                            <span className="text-accent-emerald mt-0.5">•</span>
++                            {insight}
++                          </li>
++                        ))}
++                      </ul>
++                    </div>
++                  )}
++
++                  {/* Tips */}
++                  {insights.tips?.length > 0 && (
++                    <div className="glass-card-light p-4 space-y-2">
++                      <h3 className="text-sm font-semibold text-text-main flex items-center gap-2">
++                        <Recycle className="w-4 h-4 text-accent-cyan" />
++                        Tips to Reduce
++                      </h3>
++                      <ul className="space-y-1.5">
++                        {insights.tips.map((tip, i) => (
++                          <li key={i} className="text-sm text-text-muted flex items-start gap-2">
++                            <span className="text-accent-cyan mt-0.5">•</span>
++                            {tip}
++                          </li>
++                        ))}
++                      </ul>
++                    </div>
++                  )}
++                </div>
++              )}
++
++              {/* Recalculate */}
++              <button
++                onClick={handleRecalculate}
++                className="flex items-center gap-2 mx-auto px-6 py-3 bg-surface-bg text-text-muted rounded-xl text-sm font-medium border border-card-bg hover:border-accent-emerald/30 hover:text-accent-emerald transition-all"
++              >
++                <RotateCcw className="w-4 h-4" />
++                {t("recalculate", "Recalculate")}
++              </button>
++            </div>
++          )}
+         </div>
+-      </div>
++      </main>
+     );
+   }
+ 
+-  // Questionnaire View
+-  const question = calculatorQuestions[currentStep];
+-  const progressPercent = ((currentStep + 1) / calculatorQuestions.length) * 100;
+-
++  // Question view
+   return (
+-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+-      <div className="max-w-2xl mx-auto">
+-        
+-        {/* Progress header & Skip all */}
+-        <div className="flex items-center justify-between mb-8">
+-          <div className="w-full max-w-xs">
+-            <div className="flex justify-between text-xs text-surface-200/60 mb-2 font-medium tracking-wide">
+-              <span>Question {currentStep + 1} of {calculatorQuestions.length}</span>
+-              <span>{Math.round(progressPercent)}%</span>
+-            </div>
+-            <div className="h-1.5 w-full bg-surface-800 rounded-full overflow-hidden">
+-              <div 
+-                className="h-full bg-linear-to-r from-primary-500 to-accent-500 transition-all duration-500 ease-out"
+-                style={{ width: `${progressPercent}%` }}
+-              />
+-            </div>
++    <main className="max-w-2xl mx-auto px-4 pt-24 pb-16 animate-fade-in-up">
++      <div className="space-y-8">
++        {/* Progress */}
++        <div className="space-y-2">
++          <div className="flex items-center justify-between text-xs text-text-muted">
++            <span>{t("question_of", "Question {current} of {total}").replace("{current}", step + 1).replace("{total}", questions.length)}</span>
++            <span>{Math.round(progress)}%</span>
++          </div>
++          <div className="h-1.5 bg-surface-bg border border-card-bg rounded-full overflow-hidden">
++            <div
++              className="h-full bg-linear-to-r from-accent-emerald to-accent-cyan rounded-full transition-all duration-500"
++              style={{ width: `${progress}%` }}
++            />
+           </div>
+-          <button 
+-            onClick={skipCalculator}
+-            className="text-sm font-medium text-surface-200/50 hover:text-surface-100 transition-colors"
+-          >
+-            Skip Calculator
+-          </button>
+         </div>
+ 
+         {/* Question Card */}
+-        <div className="glass-card p-6 sm:p-10 animate-fade-in-up" key={currentStep}>
+-          <h2 className="text-2xl sm:text-3xl font-bold text-surface-100 mb-8 text-center">
+-            {question.title}
+-          </h2>
++        <div className="glass-card p-8 text-center space-y-6">
++          <Icon className="w-12 h-12 text-accent-emerald mx-auto" />
++          <h2 className="text-2xl font-bold text-text-main">{currentQ.question}</h2>
+ 
+-          <div className="grid gap-4 sm:grid-cols-2">
+-            {question.options.map((option, idx) => (
++          <div className="grid gap-3">
++            {currentQ.options.map((opt, idx) => (
+               <button
+                 key={idx}
+-                onClick={() => handleSelectOption(option.value)}
+-                className="flex items-center gap-4 p-4 rounded-2xl bg-surface-800/40 border border-surface-700/50 hover:bg-surface-700/60 hover:border-primary-500/40 transition-all duration-300 group text-left"
++                onClick={() => handleSelect(opt.value)}
++                className="glass-card-light p-4 text-left hover:border-accent-emerald/40 hover:bg-accent-emerald/5 transition-all duration-300 group"
+               >
+-                <span className="text-3xl group-hover:scale-110 transition-transform duration-300">
+-                  {option.icon}
+-                </span>
+-                <span className="font-medium text-surface-100 group-hover:text-primary-300 transition-colors">
+-                  {option.label}
+-                </span>
++                <div className="flex items-center justify-between">
++                  <span className="text-sm text-text-main group-hover:text-accent-emerald transition-colors">
++                    {opt.label}
++                  </span>
++                  <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent-emerald group-hover:translate-x-1 transition-all" />
++                </div>
+               </button>
+             ))}
+           </div>
++        </div>
++
++        {/* Nav */}
++        <div className="flex items-center justify-between">
++          <button
++            onClick={() => step > 0 && setStep(step - 1)}
++            disabled={step === 0}
++            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-text-muted hover:text-text-main disabled:opacity-30 disabled:cursor-not-allowed transition-all"
++          >
++            <ChevronLeft className="w-4 h-4" />
++            Back
++          </button>
+ 
+-          <div className="mt-8 flex justify-center">
++          <div className="flex items-center gap-3">
+             <button
+-              onClick={skipQuestion}
+-              className="group inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-surface-700 hover:border-surface-600 hover:bg-surface-800 text-surface-200/70 hover:text-surface-100 transition-all text-sm font-medium"
++              onClick={() => handleSelect(currentQ.options[0].value)}
++              className="text-xs text-text-muted hover:text-text-main transition-all"
+             >
+-              Skip this question
+-              <MoveRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
++              {t("skip_question", "Skip this question")}
++            </button>
++            <button
++              onClick={handleSkip}
++              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-text-muted border border-surface-bg hover:text-warn-400 hover:border-warn-500/30 transition-all"
++            >
++              <SkipForward className="w-4 h-4" />
++              {t("skip_calculator", "Skip Calculator")}
+             </button>
+           </div>
+         </div>
+-
+       </div>
+-    </div>
++    </main>
+   );
+ }
+diff --git a/web/frontend/src/pages/History.jsx b/web/frontend/src/pages/History.jsx
+index e858e8d..72c2877 100644
+--- a/web/frontend/src/pages/History.jsx
++++ b/web/frontend/src/pages/History.jsx
+@@ -1,140 +1,154 @@
+-import { useEffect, useState } from "react";
+-import { Trash2, ShoppingBag, TrendingUp, BarChart3 } from "lucide-react";
++import { useState, useEffect } from "react";
++import { Trash2, Package, TrendingUp, BarChart3, Calendar, Tag } from "lucide-react";
+ import HistoryChart from "../components/HistoryChart";
+ import NotificationBanner from "../components/NotificationBanner";
+-import { mockHistoryEntries, mockWeeklyTrend, mockCategoryBreakdown, getTierLabel, getTierColor } from "../data/mockData";
+-import { getHistory, seedInitialData, clearHistory } from "../utils/localStorage";
++import { getHistory, clearHistory } from "../utils/localStorage";
++import { getTierColor } from "../data/mockData";
++import { mockWeeklyTrend } from "../data/mockData";
++import useAIText from "../hooks/useAIText";
+ 
+ export default function History() {
+   const [history, setHistory] = useState([]);
++  const t = useAIText("history");
+ 
+   useEffect(() => {
+-    seedInitialData(mockHistoryEntries, null);
+     setHistory(getHistory());
+   }, []);
+ 
+-  const avgScore = history.length > 0
+-    ? Math.round(history.reduce((sum, h) => sum + h.score, 0) / history.length)
+-    : 0;
+-
+-  const totalItems = history.reduce((sum, h) => sum + (h.quantity || 1), 0);
+-
+   const handleClear = () => {
+     clearHistory();
+     setHistory([]);
+   };
+ 
++  const avgScore = history.length
++    ? Math.round(history.reduce((sum, h) => sum + (h.score || 0), 0) / history.length)
++    : 0;
++
++  const categories = [...new Set(history.map((h) => h.category).filter(Boolean))];
++  const thisMonth = history.filter((h) => {
++    const d = new Date(h.date);
++    const now = new Date();
++    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
++  });
++
+   return (
+-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+-      <div className="max-w-5xl mx-auto">
+-        {/* Header */}
+-        <div className="flex items-center justify-between mb-8 animate-fade-in-up">
+-          <div>
+-            <h1 className="text-3xl font-bold text-surface-100">Purchase History</h1>
+-            <p className="text-surface-200/50 text-sm mt-1">Track your environmental footprint over time</p>
+-          </div>
+-          {history.length > 0 && (
+-            <button
+-              onClick={handleClear}
+-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-danger-400/70 hover:text-danger-400 hover:bg-danger-500/10 border border-transparent hover:border-danger-500/20 transition-all duration-300"
+-            >
+-              <Trash2 className="w-3.5 h-3.5" />
+-              Clear All
+-            </button>
+-          )}
++    <main className="max-w-4xl mx-auto px-4 pt-24 pb-16 space-y-8 animate-fade-in-up">
++      {/* Header */}
++      <section className="flex items-center justify-between">
++        <div>
++          <h1 className="text-3xl font-bold text-surface-100">{t("title", "Purchase History")}</h1>
++          <p className="text-surface-200/50 mt-1">{t("subtitle", "Track your environmental footprint over time")}</p>
+         </div>
++        {history.length > 0 && (
++          <button
++            onClick={handleClear}
++            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-danger-400 border border-danger-500/20 hover:bg-danger-500/10 transition-all"
++          >
++            <Trash2 className="w-4 h-4" />
++            {t("clear_all", "Clear All")}
++          </button>
++        )}
++      </section>
+ 
+-        {/* Summary Stats */}
+-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 animate-fade-in-up stagger-1" style={{ opacity: 0 }}>
+-          {[
+-            { label: "Total Items", value: totalItems, icon: ShoppingBag, color: "text-primary-400" },
+-            { label: "Avg Eco Score", value: avgScore, icon: TrendingUp, color: avgScore >= 75 ? "text-primary-400" : avgScore >= 50 ? "text-warn-400" : "text-danger-400" },
+-            { label: "Categories", value: mockCategoryBreakdown.length, icon: BarChart3, color: "text-accent-400" },
+-            { label: "This Month", value: history.filter(h => h.date?.startsWith("2024-03")).length, icon: ShoppingBag, color: "text-primary-300" },
+-          ].map(({ label, value, icon: Icon, color }) => (
+-            <div key={label} className="glass-card p-4 text-center">
+-              <Icon className={`w-5 h-5 ${color} mx-auto mb-2`} />
+-              <p className="text-2xl font-bold text-surface-100">{value}</p>
+-              <p className="text-xs text-surface-200/40">{label}</p>
+-            </div>
+-          ))}
+-        </div>
++      {/* Stats */}
++      <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
++        {[
++          { icon: Package, value: history.length, label: t("total_items", "Total Items") },
++          { icon: TrendingUp, value: avgScore || "—", label: t("avg_score", "Avg Eco Score") },
++          { icon: Tag, value: categories.length, label: t("categories", "Categories") },
++          { icon: Calendar, value: thisMonth.length, label: t("this_month", "This Month") },
++        ].map(({ icon: Icon, value, label }) => (
++          <div key={label} className="glass-card p-4 text-center">
++            <Icon className="w-5 h-5 text-accent-emerald mx-auto mb-2" />
++            <div className="text-xl font-bold text-surface-100">{value}</div>
++            <div className="text-xs text-surface-200/40">{label}</div>
++          </div>
++        ))}
++      </section>
++
++      {/* Notification */}
++      {avgScore >= 75 && history.length > 0 && (
++        <NotificationBanner type="success" message={t("good_score_msg", "🌱 Great job! Your average eco score is above 75. You're an Eco Champion!")} />
++      )}
++      {avgScore > 0 && avgScore < 50 && (
++        <NotificationBanner type="warning" message={t("bad_score_msg", "⚠️ Some of your recent purchases have high environmental impact. Check the alternatives!")} />
++      )}
++
++      {/* Chart */}
++      {mockWeeklyTrend?.length > 0 && <HistoryChart data={mockWeeklyTrend} />}
+ 
+-        {/* Trend Chart */}
+-        <div className="mb-8 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
+-          <HistoryChart data={mockWeeklyTrend} />
++      {/* Category Breakdown */}
++      {categories.length > 0 && (
++        <div className="glass-card p-6">
++          <h3 className="text-lg font-semibold text-surface-100 mb-4 flex items-center gap-2">
++            <BarChart3 className="w-5 h-5 text-accent-emerald" />
++            {t("category_breakdown", "Category Breakdown")}
++          </h3>
++          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
++            {categories.map((cat) => {
++              const catItems = history.filter((h) => h.category === cat);
++              const catAvg = Math.round(
++                catItems.reduce((sum, h) => sum + (h.score || 0), 0) / catItems.length
++              );
++              return (
++                <div key={cat} className="glass-card-light p-3 text-center">
++                  <div className="text-sm font-medium text-surface-100">{cat}</div>
++                  <div className="text-xs text-surface-200/40 mt-1">
++                    {catItems.length} items · Avg {catAvg}
++                  </div>
++                </div>
++              );
++            })}
++          </div>
+         </div>
++      )}
+ 
+-        {/* Category Breakdown */}
+-        <div className="glass-card p-6 mb-8 animate-fade-in-up stagger-3" style={{ opacity: 0 }}>
+-          <h3 className="text-lg font-semibold text-surface-100 mb-4">Category Breakdown</h3>
+-          <div className="space-y-4">
+-            {mockCategoryBreakdown.map((cat) => (
+-              <div key={cat.category} className="flex items-center gap-4">
+-                <div className="w-24 text-sm text-surface-200/60 flex-shrink-0">{cat.category}</div>
+-                <div className="flex-1 h-3 bg-surface-700/40 rounded-full overflow-hidden">
+-                  <div
+-                    className="h-full rounded-full transition-all duration-1000 ease-out"
+-                    style={{ width: `${cat.avgScore}%`, backgroundColor: cat.color }}
++      {/* Purchase Log */}
++      {history.length > 0 ? (
++        <div className="glass-card p-6">
++          <h3 className="text-lg font-semibold text-surface-100 mb-4">{t("purchase_log", "Purchase Log")}</h3>
++          <div className="space-y-3">
++            {history.map((item) => (
++              <div
++                key={item.id}
++                className="glass-card-light p-4 flex items-center justify-between animate-fade-in-up"
++              >
++                <div className="flex-1 min-w-0">
++                  <div className="text-sm font-medium text-surface-100 truncate">{item.name}</div>
++                  <div className="flex items-center gap-2 mt-1">
++                    {item.brand && <span className="text-xs text-surface-200/40">{item.brand}</span>}
++                    {item.category && (
++                      <span className="text-xs px-2 py-0.5 rounded-full bg-surface-800/60 border border-surface-700/30 text-surface-200/30">
++                        {item.category}
++                      </span>
++                    )}
++                    <span className="text-xs text-surface-200/30">{item.date}</span>
++                  </div>
++                </div>
++                <div className="flex items-center gap-3 shrink-0">
++                  <span
++                    className="text-sm font-bold"
++                    style={{ color: getTierColor(item.tier).text }}
++                  >
++                    {item.score}
++                  </span>
++                  <span
++                    className="w-2 h-2 rounded-full"
++                    style={{ backgroundColor: getTierColor(item.tier).text }}
+                   />
+                 </div>
+-                <span className="text-sm font-medium text-surface-100 w-12 text-right">{cat.avgScore}</span>
+-                <span className="text-xs text-surface-200/40 w-16 text-right">{cat.count} items</span>
+               </div>
+             ))}
+           </div>
+         </div>
+-
+-        {/* Notifications */}
+-        <div className="space-y-3 mb-8">
+-          {avgScore >= 75 && (
+-            <NotificationBanner type="success" message="🌱 Great job! Your average eco score is above 75. You're an Eco Champion!" />
+-          )}
+-          {history.some(h => h.score < 40) && (
+-            <NotificationBanner type="warning" message="⚠️ Some of your recent purchases have high environmental impact. Check the alternatives!" />
+-          )}
+-        </div>
+-
+-        {/* History List */}
+-        <div className="animate-fade-in-up stagger-4" style={{ opacity: 0 }}>
+-          <h3 className="text-lg font-semibold text-surface-100 mb-4">Purchase Log</h3>
+-          {history.length === 0 ? (
+-            <div className="glass-card p-8 text-center">
+-              <ShoppingBag className="w-12 h-12 text-surface-200/20 mx-auto mb-3" />
+-              <p className="text-surface-200/40">No purchases logged yet. Analyze a product and add it to your history!</p>
+-            </div>
+-          ) : (
+-            <div className="space-y-2">
+-              {history.map((item, idx) => {
+-                const tier = getTierLabel(item.score);
+-                const tierColor = getTierColor(tier);
+-                return (
+-                  <div
+-                    key={item.id || idx}
+-                    className="glass-card-light p-4 flex items-center justify-between hover:border-primary-500/20 transition-all duration-300"
+-                  >
+-                    <div className="flex items-center gap-3 min-w-0">
+-                      <div
+-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+-                        style={{ backgroundColor: tierColor.bg, color: tierColor.text, border: `1px solid ${tierColor.border}` }}
+-                      >
+-                        {item.score}
+-                      </div>
+-                      <div className="min-w-0">
+-                        <p className="text-sm font-medium text-surface-100 truncate">{item.productName}</p>
+-                        <p className="text-xs text-surface-200/40">{item.category} · {item.date}</p>
+-                      </div>
+-                    </div>
+-                    <span className="text-xs text-surface-200/40 flex-shrink-0 ml-2">
+-                      Qty: {item.quantity || 1}
+-                    </span>
+-                  </div>
+-                );
+-              })}
+-            </div>
+-          )}
++      ) : (
++        <div className="glass-card p-12 text-center">
++          <Package className="w-12 h-12 text-surface-200/20 mx-auto mb-4" />
++          <p className="text-surface-200/40">
++            {t("empty_state", "No purchases logged yet. Analyze a product and add it to your history!")}
++          </p>
+         </div>
+-      </div>
+-    </div>
++      )}
++    </main>
+   );
+ }
+diff --git a/web/frontend/src/pages/Home.jsx b/web/frontend/src/pages/Home.jsx
+index 77eb13f..9160218 100644
+--- a/web/frontend/src/pages/Home.jsx
++++ b/web/frontend/src/pages/Home.jsx
+@@ -1,50 +1,52 @@
+-import { useState } from "react";
+-import { useNavigate } from "react-router-dom";
+-import { Leaf, TrendingUp, Sparkles, Clock, Loader2 } from "lucide-react";
++import { useState, useEffect } from "react";
++import { Sparkles, Leaf, Package, TrendingUp, ArrowRight, Clock, Plus, CheckCircle } from "lucide-react";
+ import SearchInput from "../components/SearchInput";
+ import SustainabilityScoreCard from "../components/SustainabilityScoreCard";
+ import IngredientBreakdown from "../components/IngredientBreakdown";
+ import AlternativesList from "../components/AlternativesList";
+ import NotificationBanner from "../components/NotificationBanner";
+-import { mockRecentSearches } from "../data/mockData";
+-import { analyzeProduct, searchProducts, fileToBase64 } from "../services/api";
++import { analyzeProduct, fileToBase64 } from "../services/api";
+ import { addToHistory } from "../utils/localStorage";
++import useAIText from "../hooks/useAIText";
++import useProductContent from "../hooks/useProductContent";
+ 
+ export default function Home() {
+-  const navigate = useNavigate();
++  const [report, setReport] = useState(null);
++  const [searchResults, setSearchResults] = useState([]);
+   const [loading, setLoading] = useState(false);
+-  const [error, setError] = useState(null);
+-  const [report, setReport] = useState(null);         // full analyze result
+-  const [searchResults, setSearchResults] = useState(null); // search results list
++  const [recentSearches, setRecentSearches] = useState([]);
++  const [addedToHistory, setAddedToHistory] = useState(false);
++
++  const t = useAIText("home");
++  const pc = useProductContent();
++
++  useEffect(() => {
++    try {
++      const saved = JSON.parse(localStorage.getItem("gn_recent_searches") || "[]");
++      setRecentSearches(saved.slice(0, 5));
++    } catch {
++      // ignore
++    }
++  }, []);
++
++  const saveRecentSearch = (query) => {
++    const updated = [query, ...recentSearches.filter((s) => s !== query)].slice(0, 5);
++    setRecentSearches(updated);
++    localStorage.setItem("gn_recent_searches", JSON.stringify(updated));
++  };
+ 
+   const handleSearch = async (query) => {
+-    if (!query.trim()) return;
+     setLoading(true);
+-    setError(null);
+     setReport(null);
+-    setSearchResults(null);
++    setSearchResults([]);
++    setAddedToHistory(false);
++    saveRecentSearch(query);
+ 
+     try {
+-      // First try to get a full analyze report from the backend
+       const result = await analyzeProduct({ text: query });
+       setReport(result);
+-
+-      // Auto-add to local history
+-      addToHistory({
+-        productName: result.product_name,
+-        category: result.category || "General",
+-        score: result.score,
+-        quantity: 1,
+-      });
+     } catch (err) {
+-      console.error("Analyze failed, trying search:", err);
+-      try {
+-        // Fallback: try search endpoint
+-        const searchResult = await searchProducts(query);
+-        setSearchResults(searchResult.results || []);
+-      } catch (searchErr) {
+-        setError(searchErr.message || "Something went wrong. Please try again.");
+-      }
++      console.error("Analysis failed:", err);
+     } finally {
+       setLoading(false);
+     }
+@@ -52,213 +54,189 @@ export default function Home() {
+ 
+   const handleImageUpload = async (file) => {
+     setLoading(true);
+-    setError(null);
+     setReport(null);
+-    setSearchResults(null);
++    setSearchResults([]);
++    setAddedToHistory(false);
+ 
+     try {
+-      const base64 = await fileToBase64(file);
+-      const result = await analyzeProduct({ image_b64: base64 });
++      const b64 = await fileToBase64(file);
++      const result = await analyzeProduct({ image_b64: b64 });
+       setReport(result);
+-
+-      addToHistory({
+-        productName: result.product_name,
+-        category: result.category || "General",
+-        score: result.score,
+-        quantity: 1,
+-      });
+     } catch (err) {
+-      setError(err.message || "Image analysis failed. Please try again.");
++      console.error("Image analysis failed:", err);
+     } finally {
+       setLoading(false);
+     }
+   };
+ 
++  const handleAddToHistory = () => {
++    if (report && !addedToHistory) {
++      addToHistory({
++        name: report.product_name,
++        brand: report.brand,
++        category: report.category,
++        score: report.score,
++        tier: report.tier,
++        carbonFootprint: report.carbon_footprint,
++      });
++      setAddedToHistory(true);
++    }
++  };
++
+   const clearResults = () => {
+     setReport(null);
+-    setSearchResults(null);
+-    setError(null);
++    setSearchResults([]);
++    setAddedToHistory(false);
+   };
+ 
+   return (
+-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+-      <div className="max-w-4xl mx-auto">
+-        {/* Hero Section */}
+-        <div className="text-center mb-10 animate-fade-in-up">
+-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/20 mb-6">
+-            <Sparkles className="w-4 h-4 text-primary-400" />
+-            <span className="text-sm text-primary-300">AI-Powered Sustainability</span>
++    <main className="max-w-4xl mx-auto px-4 pt-24 pb-16 space-y-8 animate-fade-in-up">
++      {/* Hero */}
++      <section className="text-center space-y-4 pt-8">
++        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20">
++          <Sparkles className="w-3 h-3" />
++          {t("badge_label", "AI-Powered Sustainability")}
++        </span>
++        <h1 className="text-5xl sm:text-6xl font-bold leading-tight">
++          <span className="bg-linear-to-r from-accent-emerald via-accent-cyan to-accent-emerald-dark bg-clip-text text-transparent">
++            {t("hero_title_1", "Know Your Impact.")}
++          </span>
++          <br />
++          <span className="text-text-main">{t("hero_title_2", "Choose Better.")}</span>
++        </h1>
++        <p className="text-text-muted text-lg max-w-2xl mx-auto">
++          {t("hero_subtitle", "Paste ingredients, scan barcodes, or upload product labels — get instant sustainability reports powered by AI.")}
++        </p>
++      </section>
++
++      {/* Stats */}
++      <section className="grid grid-cols-3 gap-4">
++        {[
++          { icon: Package, value: "10K+", label: t("stat_products", "Products Analyzed") },
++          { icon: TrendingUp, value: "85%", label: t("stat_score", "Avg Eco Score") },
++          { icon: Leaf, value: "2.4K", label: t("stat_alternatives", "Alternatives Found") },
++        ].map(({ icon: Icon, value, label }) => (
++          <div key={label} className="glass-card p-4 text-center hover:border-accent-emerald/30 transition-all duration-300">
++            <Icon className="w-5 h-5 text-accent-emerald mx-auto mb-2" />
++            <div className="text-xl font-bold text-text-main">{value}</div>
++            <div className="text-xs text-text-muted">{label}</div>
+           </div>
+-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">
+-            <span className="bg-gradient-to-r from-primary-300 via-primary-400 to-accent-400 bg-clip-text text-transparent">
+-              Know Your Impact.
+-            </span>
+-            <br />
+-            <span className="text-surface-100">Choose Better.</span>
+-          </h1>
+-          <p className="text-surface-200/50 text-lg max-w-2xl mx-auto">
+-            Paste ingredients, scan barcodes, or upload product labels — get instant sustainability reports powered by AI.
+-          </p>
+-        </div>
+-
+-        {/* Search */}
+-        <div className="animate-fade-in-up stagger-1" style={{ opacity: 0 }}>
+-          <SearchInput onSearch={handleSearch} onImageUpload={handleImageUpload} />
+-        </div>
+-
+-        {/* Stats Bar */}
+-        <div className="grid grid-cols-3 gap-4 mt-8 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
+-          {[
+-            { icon: Leaf, label: "Products Analyzed", value: "2,847" },
+-            { icon: TrendingUp, label: "Avg Eco Score", value: "74" },
+-            { icon: Sparkles, label: "Alternatives Found", value: "1,203" },
+-          ].map(({ icon: Icon, label, value }) => (
+-            <div key={label} className="glass-card-light p-4 text-center">
+-              <Icon className="w-5 h-5 text-primary-400 mx-auto mb-1" />
+-              <p className="text-xl font-bold text-surface-100">{value}</p>
+-              <p className="text-xs text-surface-200/40">{label}</p>
+-            </div>
++        ))}
++      </section>
++
++      {/* Search */}
++      <SearchInput onSearch={handleSearch} onImageUpload={handleImageUpload} />
++
++      {/* Recent Searches */}
++      {recentSearches.length > 0 && !report && !loading && (
++        <div className="flex flex-wrap items-center gap-2">
++          <Clock className="w-4 h-4 text-text-muted" />
++          <span className="text-xs text-text-muted">{t("recent_searches", "Recent Searches")}:</span>
++          {recentSearches.map((q) => (
++            <button
++              key={q}
++              onClick={() => handleSearch(q)}
++              className="px-3 py-1 rounded-full text-xs bg-card-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald transition-all"
++            >
++              {q}
++            </button>
+           ))}
+         </div>
+-
+-        {/* Loading State */}
+-        {loading && (
+-          <div className="mt-12 text-center">
+-            <div className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl bg-primary-500/10 border border-primary-500/20">
+-              <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+-              <span className="text-primary-300 font-medium">Analyzing with AI...</span>
+-            </div>
+-          </div>
+-        )}
+-
+-        {/* Error */}
+-        {error && (
+-          <div className="mt-6">
+-            <NotificationBanner type="warning" message={`❌ ${error}`} />
++      )}
++
++      {/* Loading */}
++      {loading && (
++        <div className="flex flex-col items-center justify-center py-16 space-y-4 animate-fade-in-up">
++          <div className="relative">
++            <div className="w-16 h-16 border-4 border-accent-emerald/20 border-t-accent-emerald rounded-full animate-spin" />
++            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-b-accent-cyan/30 rounded-full animate-spin-slow" />
+           </div>
+-        )}
+-
+-        {/* Full Analysis Report */}
+-        {report && !loading && (
+-          <div className="mt-8 space-y-6">
+-            <div className="flex items-center justify-between">
+-              <h2 className="text-lg font-semibold text-surface-100">
+-                Analysis Report: {report.product_name}
+-              </h2>
+-              <button
+-                onClick={clearResults}
+-                className="text-sm text-surface-200/50 hover:text-primary-300 transition-colors"
+-              >
+-                New search
+-              </button>
+-            </div>
++          <p className="text-text-muted text-sm">{t("loading_text", "Analyzing with AI...")}</p>
++        </div>
++      )}
+ 
+-            {/* Score Card */}
+-            <SustainabilityScoreCard
+-              score={report.score}
+-              tier={report.tier}
+-              badge={report.badge}
+-              productName={`${report.product_name}${report.brand ? ` — ${report.brand}` : ""}`}
++      {/* Report */}
++      {report && !loading && (
++        <div className="space-y-6 animate-fade-in-up">
++          {/* Notification */}
++          {report.tier === "RED" && (
++            <NotificationBanner
++              type="warning"
++              message={pc.impactWarning}
+             />
+-
+-            {/* Carbon Footprint */}
+-            <div className="glass-card p-5">
+-              <p className="text-xs text-surface-200/40 uppercase tracking-wider mb-1">Carbon Footprint</p>
+-              <p className="text-lg font-semibold text-surface-100">{report.carbon_footprint}</p>
+-              {report.description && (
+-                <p className="text-sm text-surface-200/50 mt-2">{report.description}</p>
+-              )}
++          )}
++          {report.tier === "GREEN" && report.score >= 85 && (
++            <NotificationBanner
++              type="success"
++              message={t("notification", "🌍 Your average eco score this week is 78 — well above the community average of 62!")}
++            />
++          )}
++
++          {/* Product Header */}
++          <div className="glass-card p-6 flex items-center justify-between">
++            <div>
++              <h2 className="text-2xl font-bold text-text-main">{report.product_name}</h2>
++              <div className="flex items-center gap-3 mt-1">
++                {report.brand && <span className="text-sm text-text-muted">{report.brand}</span>}
++                {report.category && (
++                  <span className="text-xs px-2 py-0.5 rounded-full bg-card-bg/60 border border-text-muted/20 text-text-muted">
++                    {report.category}
++                  </span>
++                )}
++              </div>
+             </div>
+-
+-            {/* Ingredient Breakdown */}
+-            {report.ingredients_analysis && report.ingredients_analysis.length > 0 && (
+-              <IngredientBreakdown
+-                ingredients={report.ingredients_analysis.map((ing) => ({
+-                  name: ing.name,
+-                  score: ing.score,
+-                  impact: ing.impact,
+-                  sustainability: ing.sustainability,
+-                }))}
+-              />
+-            )}
+-
+-            {/* Alternatives */}
+-            {report.alternatives && report.alternatives.length > 0 && (
+-              <AlternativesList
+-                alternatives={report.alternatives.map((alt) => ({
+-                  name: alt.name,
+-                  score: alt.score,
+-                  price: alt.price,
+-                  reason: alt.reason,
+-                }))}
+-              />
+-            )}
+-          </div>
+-        )}
+-
+-        {/* Search Results (fallback if analyze returned multiple) */}
+-        {searchResults && !loading && (
+-          <div className="mt-8 space-y-4">
+-            <div className="flex items-center justify-between">
+-              <h2 className="text-lg font-semibold text-surface-100">
+-                Results ({searchResults.length})
+-              </h2>
++            <div className="flex items-center gap-2">
+               <button
+-                onClick={clearResults}
+-                className="text-sm text-surface-200/50 hover:text-primary-300 transition-colors"
++                onClick={handleAddToHistory}
++                disabled={addedToHistory}
++                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
++                  addedToHistory
++                    ? "bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30"
++                    : "bg-surface-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald"
++                }`}
+               >
+-                Clear results
++                {addedToHistory ? (
++                  <>
++                    <CheckCircle className="w-4 h-4" />
++                    {pc.added}
++                  </>
++                ) : (
++                  <>
++                    <Plus className="w-4 h-4" />
++                    {pc.addHistory}
++                  </>
++                )}
+               </button>
+             </div>
+-            {searchResults.map((product) => (
+-              <div
+-                key={product.id}
+-                onClick={() => handleSearch(product.name)}
+-                className="cursor-pointer hover:scale-[1.01] transition-transform duration-300"
+-              >
+-                <SustainabilityScoreCard
+-                  score={product.score}
+-                  tier={product.tier}
+-                  badge={product.badge}
+-                  productName={`${product.name}${product.brand ? ` — ${product.brand}` : ""}`}
+-                  compact
+-                />
+-              </div>
+-            ))}
+           </div>
+-        )}
+ 
+-        {/* Recent Searches — only when no results */}
+-        {!searchResults && !report && !loading && (
+-          <div className="mt-8 animate-fade-in-up stagger-3" style={{ opacity: 0 }}>
+-            <div className="flex items-center gap-2 mb-3">
+-              <Clock className="w-4 h-4 text-surface-200/40" />
+-              <span className="text-sm text-surface-200/40">Recent Searches</span>
+-            </div>
+-            <div className="flex flex-wrap gap-2">
+-              {mockRecentSearches.map((term) => (
+-                <button
+-                  key={term}
+-                  onClick={() => handleSearch(term)}
+-                  className="px-4 py-2 rounded-xl bg-surface-800/50 border border-surface-700/30 text-sm text-surface-200/60 hover:text-primary-300 hover:border-primary-500/30 transition-all duration-300"
+-                >
+-                  {term}
+-                </button>
+-              ))}
+-            </div>
++          {/* Score Card */}
++          <SustainabilityScoreCard
++            score={report.score}
++            tier={report.tier}
++            badge={report.badge}
++            carbonFootprint={report.carbon_footprint}
++            description={report.description}
++          />
++
++          {/* Ingredients */}
++          <IngredientBreakdown ingredients={report.ingredients_analysis} />
++
++          {/* Alternatives */}
++          <AlternativesList alternatives={report.alternatives} />
++
++          {/* Actions */}
++          <div className="flex gap-3 justify-center pt-4">
++            <button
++              onClick={clearResults}
++              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium bg-surface-bg/60 text-text-muted border border-text-muted/20 hover:border-accent-emerald/30 hover:text-accent-emerald transition-all duration-300"
++            >
++              {pc.newSearch}
++              <ArrowRight className="w-4 h-4" />
++            </button>
+           </div>
+-        )}
+-
+-        {/* Notification */}
+-        {!loading && !report && (
+-          <div className="mt-8 animate-fade-in-up stagger-4" style={{ opacity: 0 }}>
+-            <NotificationBanner
+-              type="success"
+-              message="🌍 Your average eco score this week is 78 — well above the community average of 62!"
+-            />
+-          </div>
+-        )}
+-      </div>
+-    </div>
++        </div>
++      )}
++    </main>
+   );
+ }
+diff --git a/web/frontend/src/pages/Profile.jsx b/web/frontend/src/pages/Profile.jsx
+index 5ede4b9..64fb5b5 100644
+--- a/web/frontend/src/pages/Profile.jsx
++++ b/web/frontend/src/pages/Profile.jsx
+@@ -1,106 +1,107 @@
+ import { useEffect, useState } from "react";
+-import { Award, TrendingUp, Target, Flame } from "lucide-react";
++import { Award, TrendingUp, Package, Zap } from "lucide-react";
+ import BadgeCard from "../components/BadgeCard";
+ import NotificationBanner from "../components/NotificationBanner";
+-import { mockBadges, mockHistoryEntries } from "../data/mockData";
+-import { getHistory, seedInitialData } from "../utils/localStorage";
++import { getBadges, saveBadges } from "../utils/localStorage";
++import { getHistory } from "../utils/localStorage";
++import { mockBadges } from "../data/mockData";
++import useAIText from "../hooks/useAIText";
+ 
+ export default function Profile() {
+-  const [history, setHistory] = useState([]);
++  const [badges, setBadges] = useState([]);
++  const t = useAIText("profile");
+ 
+   useEffect(() => {
+-    seedInitialData(mockHistoryEntries, null);
+-    setHistory(getHistory());
++    let saved = getBadges();
++    if (!saved.length) {
++      saveBadges(mockBadges);
++      saved = mockBadges;
++    }
++    setBadges(saved);
+   }, []);
+ 
+-  const earnedCount = mockBadges.filter((b) => b.earned).length;
+-  const totalBadges = mockBadges.length;
+-  const avgScore = history.length > 0
+-    ? Math.round(history.reduce((s, h) => s + h.score, 0) / history.length)
++  const history = getHistory();
++  const earned = badges.filter((b) => b.earned);
++  const avgScore = history.length
++    ? Math.round(history.reduce((sum, h) => sum + (h.score || 0), 0) / history.length)
+     : 0;
+ 
+-  const streak = 12; // mock streak days
+-
+   return (
+-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+-      <div className="max-w-5xl mx-auto">
+-        {/* Header */}
+-        <div className="text-center mb-10 animate-fade-in-up">
+-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-primary-500/30">
+-            <Award className="w-10 h-10 text-white" />
+-          </div>
+-          <h1 className="text-3xl font-bold text-surface-100">Eco Profile</h1>
+-          <p className="text-surface-200/50 text-sm mt-1">Your sustainability journey at a glance</p>
+-        </div>
++    <main className="max-w-4xl mx-auto px-4 pt-24 pb-16 space-y-8 animate-fade-in-up">
++      {/* Header */}
++      <section className="text-center space-y-2">
++        <h1 className="text-3xl font-bold text-text-main">{t("title", "Eco Profile")}</h1>
++        <p className="text-text-muted">{t("subtitle", "Your sustainability journey at a glance")}</p>
++      </section>
+ 
+-        {/* Stats Row */}
+-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10 animate-fade-in-up stagger-1" style={{ opacity: 0 }}>
+-          {[
+-            { icon: Award, label: "Badges Earned", value: `${earnedCount}/${totalBadges}`, color: "text-primary-400" },
+-            { icon: TrendingUp, label: "Avg Eco Score", value: avgScore, color: avgScore >= 75 ? "text-primary-400" : "text-warn-400" },
+-            { icon: Target, label: "Products Scanned", value: history.length, color: "text-accent-400" },
+-            { icon: Flame, label: "Day Streak", value: streak, color: "text-warn-400" },
+-          ].map(({ icon: Icon, label, value, color }) => (
+-            <div key={label} className="glass-card p-5 text-center">
+-              <Icon className={`w-6 h-6 ${color} mx-auto mb-2`} />
+-              <p className="text-2xl font-bold text-surface-100">{value}</p>
+-              <p className="text-xs text-surface-200/40 mt-1">{label}</p>
+-            </div>
+-          ))}
+-        </div>
++      {/* Stats */}
++      <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
++        {[
++          { icon: Award, value: earned.length, label: t("badges_earned", "Badges Earned") },
++          { icon: TrendingUp, value: avgScore || "—", label: t("avg_score", "Avg Eco Score") },
++          { icon: Package, value: history.length, label: t("products_scanned", "Products Scanned") },
++          { icon: Zap, value: "7", label: t("day_streak", "Day Streak") },
++        ].map(({ icon: Icon, value, label }) => (
++          <div key={label} className="glass-card p-4 text-center">
++            <Icon className="w-5 h-5 text-accent-emerald mx-auto mb-2" />
++            <div className="text-xl font-bold text-text-main">{value}</div>
++            <div className="text-xs text-text-muted">{label}</div>
++          </div>
++        ))}
++      </section>
+ 
+-        {/* Notifications */}
+-        <div className="space-y-3 mb-8 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
+-          {earnedCount >= 3 && (
+-            <NotificationBanner type="success" message={`🏆 Amazing! You've earned ${earnedCount} out of ${totalBadges} badges. Keep going!`} />
+-          )}
+-          {avgScore < 50 && (
+-            <NotificationBanner type="warning" message="🌿 Your average eco score is below 50. Try switching to eco-friendly alternatives to boost your score!" />
+-          )}
+-        </div>
++      {/* Notifications */}
++      {earned.length >= 3 && (
++        <NotificationBanner
++          type="success"
++          message={t("great_badges_msg", "🏆 Amazing! You've earned {earned} out of {total} badges. Keep going!")
++            .replace("{earned}", earned.length)
++            .replace("{total}", badges.length)}
++        />
++      )}
++      {avgScore > 0 && avgScore < 50 && (
++        <NotificationBanner
++          type="warning"
++          message={t("low_score_msg", "🌿 Your average eco score is below 50. Try switching to eco-friendly alternatives to boost your score!")}
++        />
++      )}
+ 
+-        {/* Badges Grid */}
+-        <div className="animate-fade-in-up stagger-3" style={{ opacity: 0 }}>
+-          <h2 className="text-xl font-semibold text-surface-100 mb-6 flex items-center gap-2">
+-            <Award className="w-5 h-5 text-primary-400" />
+-            Your Badges
+-          </h2>
+-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+-            {mockBadges.map((badge) => (
+-              <BadgeCard key={badge.id} badge={badge} />
+-            ))}
+-          </div>
++      {/* Badges */}
++      <section>
++        <h2 className="text-xl font-semibold text-text-main mb-4">{t("your_badges", "Your Badges")}</h2>
++        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
++          {badges.map((badge, idx) => (
++            <BadgeCard key={idx} badge={badge} />
++          ))}
+         </div>
++      </section>
+ 
+-        {/* Progress Section */}
+-        <div className="mt-10 glass-card p-6 animate-fade-in-up stagger-4" style={{ opacity: 0 }}>
+-          <h3 className="text-lg font-semibold text-surface-100 mb-4">Progress to Next Badge</h3>
+-          <div className="space-y-4">
+-            {mockBadges
+-              .filter((b) => !b.earned)
+-              .map((badge) => {
+-                const progress = Math.floor(Math.random() * 70) + 10; // mock progress
+-                return (
+-                  <div key={badge.id} className="flex items-center gap-4">
+-                    <span className="text-2xl flex-shrink-0">{badge.icon}</span>
+-                    <div className="flex-1">
+-                      <div className="flex items-center justify-between mb-1">
+-                        <span className="text-sm text-surface-100 font-medium">{badge.name}</span>
+-                        <span className="text-xs text-surface-200/40">{progress}%</span>
+-                      </div>
+-                      <div className="h-2 bg-surface-700/40 rounded-full overflow-hidden">
+-                        <div
+-                          className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-400 transition-all duration-1000"
+-                          style={{ width: `${progress}%` }}
+-                        />
+-                      </div>
+-                    </div>
++      {/* Progress */}
++      <section className="glass-card p-6">
++        <h3 className="text-lg font-semibold text-text-main mb-4">{t("progress_title", "Progress to Next Badge")}</h3>
++        <div className="space-y-3">
++          {badges
++            .filter((b) => !b.earned)
++            .slice(0, 3)
++            .map((badge, idx) => (
++              <div key={idx} className="glass-card-light p-4">
++                <div className="flex items-center justify-between mb-2">
++                  <div className="flex items-center gap-2">
++                    <span className="text-xl">{badge.icon || "🏅"}</span>
++                    <span className="text-sm font-medium text-text-main">{badge.name}</span>
+                   </div>
+-                );
+-              })}
+-          </div>
++                  <span className="text-xs text-text-muted">{(badge.progress || 0)}%</span>
++                </div>
++                <div className="h-1.5 bg-surface-bg border border-card-bg rounded-full overflow-hidden">
++                  <div
++                    className="h-full bg-linear-to-r from-accent-emerald to-accent-cyan rounded-full transition-all duration-1000"
++                    style={{ width: `${badge.progress || 0}%` }}
++                  />
++                </div>
++              </div>
++            ))}
+         </div>
+-      </div>
+-    </div>
++      </section>
++    </main>
+   );
+ }
+diff --git a/web/frontend/src/pages/ReportDetail.jsx b/web/frontend/src/pages/ReportDetail.jsx
+index b1dcd2c..3603b79 100644
+--- a/web/frontend/src/pages/ReportDetail.jsx
++++ b/web/frontend/src/pages/ReportDetail.jsx
+@@ -1,114 +1,153 @@
+-import { useParams, useNavigate, Link } from "react-router-dom";
+-import { ArrowLeft, Plus, Share2, Package } from "lucide-react";
++import { useParams, useNavigate } from "react-router-dom";
++import { useEffect, useState } from "react";
++import { ArrowLeft, AlertTriangle, Plus, CheckCircle } from "lucide-react";
+ import SustainabilityScoreCard from "../components/SustainabilityScoreCard";
+ import IngredientBreakdown from "../components/IngredientBreakdown";
+ import AlternativesList from "../components/AlternativesList";
+ import NotificationBanner from "../components/NotificationBanner";
+-import { mockProducts } from "../data/mockData";
++import { analyzeProduct } from "../services/api";
+ import { addToHistory } from "../utils/localStorage";
+-import { useState } from "react";
++import useProductContent from "../hooks/useProductContent";
+ 
+ export default function ReportDetail() {
+   const { id } = useParams();
+   const navigate = useNavigate();
+-  const [added, setAdded] = useState(false);
++  const [report, setReport] = useState(null);
++  const [loading, setLoading] = useState(true);
++  const [addedToHistory, setAddedToHistory] = useState(false);
+ 
+-  const product = mockProducts.find((p) => p.id === id) || mockProducts[0];
++  const pc = useProductContent();
++
++  useEffect(() => {
++    async function load() {
++      setLoading(true);
++      try {
++        const result = await analyzeProduct({ text: decodeURIComponent(id) });
++        setReport(result);
++      } catch (err) {
++        console.error("Failed to load report:", err);
++      } finally {
++        setLoading(false);
++      }
++    }
++    load();
++  }, [id]);
+ 
+   const handleAddToHistory = () => {
+-    addToHistory({
+-      productName: product.name,
+-      category: product.category,
+-      score: product.score,
+-      quantity: 1,
+-    });
+-    setAdded(true);
+-    setTimeout(() => setAdded(false), 3000);
++    if (report && !addedToHistory) {
++      addToHistory({
++        name: report.product_name,
++        brand: report.brand,
++        category: report.category,
++        score: report.score,
++        tier: report.tier,
++        carbonFootprint: report.carbon_footprint,
++      });
++      setAddedToHistory(true);
++    }
+   };
+ 
+-  return (
+-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+-      <div className="max-w-4xl mx-auto">
+-        {/* Back Button */}
++  if (loading) {
++    return (
++      <main className="max-w-3xl mx-auto px-4 pt-24 pb-16">
++        <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-fade-in-up">
++          <div className="w-16 h-16 border-4 border-accent-emerald/20 border-t-accent-emerald rounded-full animate-spin" />
++          <p className="text-text-muted text-sm">Loading report...</p>
++        </div>
++      </main>
++    );
++  }
++
++  if (!report) {
++    return (
++      <main className="max-w-3xl mx-auto px-4 pt-24 pb-16 text-center">
++        <p className="text-text-muted">Report not found.</p>
+         <button
+-          onClick={() => navigate(-1)}
+-          className="flex items-center gap-2 text-sm text-surface-200/50 hover:text-primary-300 transition-colors mb-6"
++          onClick={() => navigate("/")}
++          className="mt-4 text-accent-emerald hover:text-accent-emerald-dark text-sm"
+         >
+-          <ArrowLeft className="w-4 h-4" />
+-          Back to search
++          {pc.backButton}
+         </button>
++      </main>
++    );
++  }
+ 
+-        {/* Product Header */}
+-        <div className="animate-fade-in-up">
+-          <div className="flex items-center gap-3 mb-2">
+-            <div className="w-10 h-10 rounded-xl bg-primary-500/15 flex items-center justify-center">
+-              <Package className="w-5 h-5 text-primary-400" />
+-            </div>
+-            <div>
+-              <h1 className="text-2xl font-bold text-surface-100">{product.name}</h1>
+-              <p className="text-sm text-surface-200/50">{product.brand} · {product.category}</p>
+-            </div>
+-          </div>
+-          <p className="text-surface-200/60 text-sm mt-3 leading-relaxed">{product.description}</p>
+-        </div>
++  return (
++    <main className="max-w-3xl mx-auto px-4 pt-24 pb-16 space-y-6 animate-fade-in-up">
++      {/* Nav */}
++      <button
++        onClick={() => navigate("/")}
++        className="flex items-center gap-2 text-sm text-text-muted hover:text-accent-emerald transition-colors"
++      >
++        <ArrowLeft className="w-4 h-4" />
++        {pc.backButton}
++      </button>
+ 
+-        {/* Score Card */}
+-        <div className="mt-6 animate-fade-in-up stagger-1" style={{ opacity: 0 }}>
+-          <SustainabilityScoreCard
+-            score={product.score}
+-            tier={product.tier}
+-            badge={product.badge}
+-            productName={product.name}
+-          />
+-        </div>
++      {/* Impact warning */}
++      {report.tier === "RED" && (
++        <NotificationBanner type="warning" message={pc.impactWarning} />
++      )}
+ 
+-        {/* Warning for red products */}
+-        {product.tier === "RED" && (
+-          <div className="mt-4 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
+-            <NotificationBanner
+-              type="warning"
+-              message={`⚠️ This product has a high environmental impact (score: ${product.score}/100). Consider switching to one of the alternatives below.`}
+-            />
+-          </div>
+-        )}
+-
+-        {/* Carbon Footprint */}
+-        <div className="mt-6 glass-card p-5 animate-fade-in-up stagger-2" style={{ opacity: 0 }}>
+-          <div className="flex items-center justify-between">
+-            <div>
+-              <p className="text-xs text-surface-200/40 uppercase tracking-wider mb-1">Carbon Footprint</p>
+-              <p className="text-lg font-semibold text-surface-100">{product.carbonFootprint}</p>
+-            </div>
+-            <div className="flex gap-2">
+-              <button
+-                onClick={handleAddToHistory}
+-                disabled={added}
+-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+-                  added
+-                    ? "bg-primary-500/20 text-primary-300 border border-primary-500/30"
+-                    : "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/20 hover:shadow-primary-500/40 hover:from-primary-400 hover:to-primary-500"
+-                }`}
+-              >
+-                <Plus className="w-4 h-4" />
+-                {added ? "Added ✓" : "Add to History"}
+-              </button>
+-              <button className="p-2.5 rounded-xl bg-surface-800/60 border border-surface-700/30 text-surface-200/50 hover:text-primary-300 hover:border-primary-500/30 transition-all duration-300">
+-                <Share2 className="w-4 h-4" />
+-              </button>
+-            </div>
++      {/* Product Header */}
++      <div className="glass-card p-6 flex items-center justify-between">
++        <div>
++          <h1 className="text-2xl font-bold text-text-main">{report.product_name}</h1>
++          <div className="flex items-center gap-3 mt-1">
++            {report.brand && <span className="text-sm text-text-muted">{report.brand}</span>}
++            {report.category && (
++              <span className="text-xs px-2 py-0.5 rounded-full bg-surface-bg border border-card-bg text-text-muted">
++                {report.category}
++              </span>
++            )}
+           </div>
+         </div>
++        <button
++          onClick={handleAddToHistory}
++          disabled={addedToHistory}
++          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
++            addedToHistory
++              ? "bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30"
++              : "bg-surface-bg text-text-muted border border-card-bg hover:border-accent-emerald/30 hover:text-accent-emerald"
++          }`}
++        >
++          {addedToHistory ? (
++            <>
++              <CheckCircle className="w-4 h-4" />
++              {pc.added}
++            </>
++          ) : (
++            <>
++              <Plus className="w-4 h-4" />
++              {pc.addHistory}
++            </>
++          )}
++        </button>
++      </div>
+ 
+-        {/* Ingredient Breakdown */}
+-        <div className="mt-6 animate-fade-in-up stagger-3" style={{ opacity: 0 }}>
+-          <IngredientBreakdown ingredients={product.ingredients} />
+-        </div>
++      {/* Score Card */}
++      <SustainabilityScoreCard
++        score={report.score}
++        tier={report.tier}
++        badge={report.badge}
++        carbonFootprint={report.carbon_footprint}
++        description={report.description}
++      />
+ 
+-        {/* Alternatives */}
+-        <div className="mt-6 animate-fade-in-up stagger-4" style={{ opacity: 0 }}>
+-          <AlternativesList alternatives={product.alternatives} />
+-        </div>
++      {/* Ingredients */}
++      <IngredientBreakdown ingredients={report.ingredients_analysis} />
++
++      {/* Alternatives */}
++      <AlternativesList alternatives={report.alternatives} />
++
++      {/* Back to search */}
++      <div className="flex justify-center pt-4">
++        <button
++          onClick={() => navigate("/")}
++          className="px-6 py-2.5 rounded-xl text-sm font-medium bg-surface-bg text-text-muted border border-card-bg hover:border-accent-emerald/30 hover:text-accent-emerald transition-all duration-300"
++        >
++          {pc.newSearch}
++        </button>
+       </div>
+-    </div>
++    </main>
+   );
+ }
+diff --git a/web/frontend/src/services/api.js b/web/frontend/src/services/api.js
+index 7647d33..f534cc2 100644
+--- a/web/frontend/src/services/api.js
++++ b/web/frontend/src/services/api.js
+@@ -1,6 +1,6 @@
+ /**
+  * GreenNova - API Service
+- * Connects the React frontend to the FastAPI backend (Ollama + Gemma 3 12B).
++ * Connects the React frontend to the FastAPI backend (Ollama + Gemma 3).
+  *
+  * Flow:
+  *   1. Try calling the real backend API.
+@@ -16,8 +16,9 @@ const FORCE_MOCK = import.meta.env.VITE_MOCK_MODE === "true";
+ // ---------- Helpers ----------
+ 
+ async function apiFetch(path, options = {}) {
++  const timeout = options.timeout || 30000;
+   const controller = new AbortController();
+-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout for AI calls
++  const timer = setTimeout(() => controller.abort(), timeout);
+ 
+   try {
+     const res = await fetch(`${API_BASE}${path}`, {
+@@ -36,7 +37,7 @@ async function apiFetch(path, options = {}) {
+ 
+     return await res.json();
+   } finally {
+-    clearTimeout(timeout);
++    clearTimeout(timer);
+   }
+ }
+ 
+@@ -45,7 +46,6 @@ async function apiFetch(path, options = {}) {
+ function mockAnalyze(text) {
+   const lower = (text || "").toLowerCase();
+ 
+-  // Try to match a mock product by name/keyword
+   const matched = mockProducts.find(
+     (p) =>
+       lower.includes(p.name.toLowerCase()) ||
+@@ -104,11 +104,10 @@ function mockSearch(query) {
+   return { type: "GENERALIZED", results };
+ }
+ 
+-// ---------- Public API ----------
++// ---------- Public API (existing) ----------
+ 
+ /**
+  * POST /api/analyze — Analyze a product's sustainability
+- * Falls back to mock data when backend is unreachable.
+  */
+ export async function analyzeProduct({ text, image_b64, barcode } = {}) {
+   if (FORCE_MOCK) {
+@@ -128,7 +127,6 @@ export async function analyzeProduct({ text, image_b64, barcode } = {}) {
+ 
+ /**
+  * POST /api/search — Search products with sustainability scores
+- * Falls back to mock data when backend is unreachable.
+  */
+ export async function searchProducts(query) {
+   if (FORCE_MOCK) {
+@@ -148,7 +146,6 @@ export async function searchProducts(query) {
+ 
+ /**
+  * GET /health — Check if backend + Ollama are reachable
+- * @returns {{ status, mock_mode, model, ollama_url }}
+  */
+ export async function healthCheck() {
+   if (FORCE_MOCK) {
+@@ -177,7 +174,6 @@ export function fileToBase64(file) {
+     const reader = new FileReader();
+     reader.readAsDataURL(file);
+     reader.onload = () => {
+-      // Strip the data:image/...;base64, prefix
+       const base64 = reader.result.split(",")[1];
+       resolve(base64);
+     };
+@@ -185,4 +181,59 @@ export function fileToBase64(file) {
+   });
+ }
+ 
++// ---------- New AI Content Endpoints ----------
++
++/**
++ * GET /api/ui-text?section=... — Fetch AI-generated UI strings
++ * Falls back to null if backend is unreachable (caller uses defaults).
++ */
++export async function fetchUIText(section) {
++  if (FORCE_MOCK) return null;
++
++  try {
++    return await apiFetch(`/api/ui-text?section=${encodeURIComponent(section)}`, {
++      timeout: 10000,
++    });
++  } catch (err) {
++    console.warn(`UI text fetch failed for section "${section}":`, err.message);
++    return null;
++  }
++}
++
++/**
++ * POST /api/calculator/score — AI-powered calculator scoring
++ */
++export async function fetchCalculatorScore(answers, totalCO2) {
++  if (FORCE_MOCK) return null;
++
++  try {
++    return await apiFetch("/api/calculator/score", {
++      method: "POST",
++      body: JSON.stringify({ answers, total_co2: totalCO2 }),
++      timeout: 15000,
++    });
++  } catch (err) {
++    console.warn("Calculator score fetch failed:", err.message);
++    return null;
++  }
++}
++
++/**
++ * POST /api/content/generate — Generic AI content generation
++ */
++export async function generateContent(contentType, context = "") {
++  if (FORCE_MOCK) return null;
++
++  try {
++    return await apiFetch("/api/content/generate", {
++      method: "POST",
++      body: JSON.stringify({ content_type: contentType, context }),
++      timeout: 10000,
++    });
++  } catch (err) {
++    console.warn("Content generation failed:", err.message);
++    return null;
++  }
++}
++
+ export { API_BASE, FORCE_MOCK as MOCK_MODE };
